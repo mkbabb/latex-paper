@@ -5,8 +5,7 @@ import {
   astToText
 } from "./chunk-O3YJJZOY.js";
 
-// src/transform/html.ts
-var DEFAULT_MACROS = {};
+// src/transform/clean.ts
 function replaceAccents(text) {
   for (const [cmd, map] of Object.entries(ACCENT_MAPS)) {
     if (Object.keys(map).length === 0) continue;
@@ -32,14 +31,6 @@ function replaceSymbols(text) {
     );
   }
   return text;
-}
-function cleanRawLatex(text, labelResolver) {
-  const parts = text.split(/(\$[^$]*\$)/g);
-  for (let i = 0; i < parts.length; i++) {
-    if (i % 2 === 1) continue;
-    parts[i] = cleanProseSegment(parts[i], labelResolver);
-  }
-  return parts.join("").replace(/  +/g, " ");
 }
 function cleanProseSegment(text, labelResolver) {
   text = replaceAccents(text);
@@ -88,9 +79,19 @@ function cleanProseSegment(text, labelResolver) {
   text = text.replace(/[{}]/g, "");
   return text;
 }
+function cleanRawLatex(text, labelResolver) {
+  const parts = text.split(/(\$[^$]*\$)/g);
+  for (let i = 0; i < parts.length; i++) {
+    if (i % 2 === 1) continue;
+    parts[i] = cleanProseSegment(parts[i], labelResolver);
+  }
+  return parts.join("").replace(/  +/g, " ");
+}
 function slugify(text) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
+
+// src/transform/validate.ts
 var SUSPICIOUS_PATTERNS = [
   { pattern: /\\['"` ^~]\{[a-zA-Z]\}/, description: "Unprocessed braced accent" },
   { pattern: /\\['"` ^~][a-zA-Z]/, description: "Unprocessed unbraced accent" },
@@ -127,8 +128,11 @@ function validateOutput(sections) {
   function scanSection(section, prefix) {
     const path = `${prefix}/${section.id}`;
     scanText(section.title, `${path}/title`);
-    for (let i = 0; i < section.paragraphs.length; i++) {
-      scanText(section.paragraphs[i], `${path}/paragraph[${i}]`);
+    for (let i = 0; i < section.content.length; i++) {
+      const block = section.content[i];
+      if (typeof block === "string") {
+        scanText(block, `${path}/paragraph[${i}]`);
+      }
     }
     if (section.theorems) {
       for (let i = 0; i < section.theorems.length; i++) {
@@ -153,6 +157,9 @@ function validateOutput(sections) {
   }
   return issues;
 }
+
+// src/transform/html.ts
+var DEFAULT_MACROS = {};
 var Transformer = class {
   options;
   bibEntries;
@@ -206,7 +213,7 @@ var Transformer = class {
     for (const range of ranges) {
       const bodyNodes = nodes.slice(range.startIdx, range.endIdx);
       const id = slugify(range.title);
-      const paragraphs = this.extractParagraphs(bodyNodes);
+      const content = this.extractContent(bodyNodes);
       const theorems = this.extractTheorems(bodyNodes);
       const figures = this.extractFigures(bodyNodes);
       const callout = callouts[id];
@@ -219,7 +226,7 @@ var Transformer = class {
           id,
           number: String(chapterNum),
           title: range.title,
-          paragraphs,
+          content,
           ...theorems.length > 0 && { theorems },
           ...figures.length > 0 && { figures },
           subsections: [],
@@ -235,7 +242,7 @@ var Transformer = class {
             id,
             number: String(chapterNum),
             title: range.title,
-            paragraphs,
+            content,
             ...theorems.length > 0 && { theorems },
             ...figures.length > 0 && { figures },
             ...callout && { callout }
@@ -247,7 +254,7 @@ var Transformer = class {
             id,
             number: `${chapterNum}.${sectionNum}`,
             title: range.title,
-            paragraphs,
+            content,
             ...theorems.length > 0 && { theorems },
             ...figures.length > 0 && { figures },
             subsections: [],
@@ -263,7 +270,7 @@ var Transformer = class {
             id,
             number: `${chapterNum}.${sectionNum}`,
             title: range.title,
-            paragraphs,
+            content,
             ...theorems.length > 0 && { theorems },
             ...figures.length > 0 && { figures },
             subsections: [],
@@ -279,7 +286,7 @@ var Transformer = class {
               id,
               number: `${chapterNum}.${sectionNum}.${subsectionNum}`,
               title: range.title,
-              paragraphs,
+              content,
               ...theorems.length > 0 && { theorems },
               ...figures.length > 0 && { figures },
               ...callout && { callout }
@@ -359,19 +366,33 @@ var Transformer = class {
       }
     }
   }
-  /** Extract paragraphs from body nodes (text between theorem/figure/math envs). */
-  extractParagraphs(nodes) {
-    const paragraphs = [];
+  /**
+   * Extract interleaved paragraphs and display math from body nodes.
+   * Returns ContentBlock[]: strings are paragraph HTML, MathBlockData are equations.
+   */
+  extractContent(nodes) {
+    const content = [];
     let current = [];
     const flush = () => {
       const text = current.join("").replace(/  +/g, " ").trim();
       if (text.length > 10) {
-        paragraphs.push(text);
+        content.push(text);
       }
       current = [];
     };
     for (const node of nodes) {
-      if (node.type === "theorem" || node.type === "figure" || node.type === "proof" || node.type === "math" && node.display || node.type === "section") {
+      if (node.type === "theorem" || node.type === "figure" || node.type === "proof" || node.type === "section") {
+        continue;
+      }
+      if (node.type === "math" && node.display) {
+        flush();
+        const source = node.rawValue ?? node.value;
+        const labelMatch = source.match(/\\label\{([^}]+)\}/);
+        let id;
+        if (labelMatch) {
+          id = labelMatch[1].replace(/:/g, "-");
+        }
+        content.push({ tex: node.value, ...id && { id } });
         continue;
       }
       if (node.type === "paragraphBreak") {
@@ -381,7 +402,7 @@ var Transformer = class {
       current.push(this.nodeToHtml(node));
     }
     flush();
-    return paragraphs;
+    return content;
   }
   /** Extract theorems from body nodes. */
   extractTheorems(nodes) {
@@ -585,10 +606,10 @@ function transformDocument(nodes, options) {
 }
 
 export {
-  DEFAULT_MACROS,
   cleanRawLatex,
   validateOutput,
+  DEFAULT_MACROS,
   Transformer,
   transformDocument
 };
-//# sourceMappingURL=chunk-RDKNT5AC.js.map
+//# sourceMappingURL=chunk-4LCLO5SZ.js.map

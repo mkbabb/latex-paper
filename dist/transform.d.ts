@@ -1,14 +1,43 @@
 import { BibEntry, LatexNode } from './index.js';
 export { CommandNode, CommentNode, DescriptionNode, EnvironmentNode, FigureNode, GroupNode, LabelInfo, LabelNode, LabelRegistry, ListNode, MathNode, ParagraphBreakNode, ProofNode, QuoteNode, SectionNode, TextNode, TheoremNode, astToText, parseBibString, parseBibToMap, parseInlineString, parseLatex } from './index.js';
-import { P as PaperSectionData, a as PaperLabelInfo } from './output-DTw88a0I.js';
-export { b as PaperFigureData, c as PaperTheoremData } from './output-DTw88a0I.js';
+import { a as PaperSectionData, c as PaperLabelInfo } from './output-zFciSIqc.js';
+export { C as ContentBlock, M as MathBlockData, P as PaperFigureData, b as PaperTheoremData } from './output-zFciSIqc.js';
 
 /**
- * AST → HTML transformer with configurable macros and callouts.
+ * Raw LaTeX text cleanup utilities.
  *
  * Text nodes from braceBalanced() contain raw LaTeX (accents, dashes,
  * nested commands, etc.). cleanRawLatex() processes these patterns,
  * mirroring the old regex-based parser's cleanProseSegment().
+ */
+/**
+ * Clean residual LaTeX patterns from text node content.
+ *
+ * Math segments ($...$) are preserved verbatim.
+ *
+ * @param labelResolver Optional function to resolve \ref{key} → number string.
+ */
+declare function cleanRawLatex(text: string, labelResolver?: (key: string) => string | undefined): string;
+
+/**
+ * Output validation — scan transformed PaperSectionData for
+ * suspicious unprocessed LaTeX patterns.
+ */
+
+interface ValidationIssue {
+    path: string;
+    text: string;
+    pattern: string;
+    match: string;
+}
+/**
+ * Scan transformed output for suspicious unprocessed LaTeX patterns.
+ * Returns a list of issues found.
+ */
+declare function validateOutput(sections: PaperSectionData[]): ValidationIssue[];
+
+/**
+ * AST → HTML transformer with configurable macros and callouts.
  */
 
 interface TransformOptions {
@@ -26,31 +55,6 @@ interface TransformOptions {
 }
 /** Default KaTeX macros used in the fourier_paper. */
 declare const DEFAULT_MACROS: Record<string, string>;
-/**
- * Clean residual LaTeX patterns from text node content.
- *
- * With braceContent() parsing command arguments through the inline parser,
- * most LaTeX (accents, dashes, quotes, formatting, refs) is properly handled
- * in the AST. This function catches residual patterns that may appear in
- * text nodes from opaque sources (e.g. braceBalanced() for keys/filenames)
- * or edge cases the parser doesn't cover.
- *
- * Math segments ($...$) are preserved verbatim.
- *
- * @param labelResolver Optional function to resolve \ref{key} → number string.
- */
-declare function cleanRawLatex(text: string, labelResolver?: (key: string) => string | undefined): string;
-interface ValidationIssue {
-    path: string;
-    text: string;
-    pattern: string;
-    match: string;
-}
-/**
- * Scan transformed output for suspicious unprocessed LaTeX patterns.
- * Returns a list of issues found.
- */
-declare function validateOutput(sections: PaperSectionData[]): ValidationIssue[];
 /**
  * Transform a LaTeX AST into structured PaperSectionData[].
  */
@@ -71,8 +75,11 @@ declare class Transformer {
     /** Generate content summary strings for each section (recursive). */
     private generateSummaries;
     private cleanEmpty;
-    /** Extract paragraphs from body nodes (text between theorem/figure/math envs). */
-    private extractParagraphs;
+    /**
+     * Extract interleaved paragraphs and display math from body nodes.
+     * Returns ContentBlock[]: strings are paragraph HTML, MathBlockData are equations.
+     */
+    private extractContent;
     /** Extract theorems from body nodes. */
     private extractTheorems;
     /** Extract figures from body nodes. */

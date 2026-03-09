@@ -418,7 +418,8 @@ import { inject as inject3 } from "vue";
 var MathBlock_default = /* @__PURE__ */ _defineComponent({
   __name: "MathBlock",
   props: {
-    tex: { type: String, required: true }
+    tex: { type: String, required: true },
+    id: { type: String, required: false }
   },
   setup(__props, { expose: __expose }) {
     __expose();
@@ -436,8 +437,9 @@ import { setBlockTracking as _setBlockTracking, createElementVNode as _createEle
 function render(_ctx, _cache, $props, $setup, $data, $options) {
   return _cache[0] || (_setBlockTracking(-1, true), (_cache[0] = _createElementVNode("div", {
     class: "math-block",
+    id: $props.id,
     innerHTML: $setup.html
-  }, null, 8, ["innerHTML"])).cacheIndex = 0, _setBlockTracking(1), _cache[0]);
+  }, null, 8, ["id", "innerHTML"])).cacheIndex = 0, _setBlockTracking(1), _cache[0]);
 }
 
 // src/vue/components/MathBlock.vue
@@ -686,7 +688,7 @@ var PaperSectionContent_default = /* @__PURE__ */ _defineComponent5({
 });
 
 // sfc-template:/Users/mkbabb/Programming/latex-paper/src/vue/components/PaperSectionContent.vue?type=template
-import { createCommentVNode as _createCommentVNode3, renderList as _renderList, Fragment as _Fragment2, openBlock as _openBlock3, createElementBlock as _createElementBlock3, resolveDynamicComponent as _resolveDynamicComponent2, createBlock as _createBlock2, withCtx as _withCtx2, resolveComponent as _resolveComponent, toDisplayString as _toDisplayString3, createElementVNode as _createElementVNode5 } from "vue";
+import { createCommentVNode as _createCommentVNode3, renderList as _renderList, Fragment as _Fragment2, openBlock as _openBlock3, createElementBlock as _createElementBlock3, createBlock as _createBlock2, resolveDynamicComponent as _resolveDynamicComponent2, withCtx as _withCtx2, resolveComponent as _resolveComponent, toDisplayString as _toDisplayString3, createElementVNode as _createElementVNode5 } from "vue";
 var _hoisted_13 = ["innerHTML"];
 var _hoisted_23 = ["innerHTML"];
 var _hoisted_33 = ["id"];
@@ -708,22 +710,34 @@ function render5(_ctx, _cache, $props, $setup, $data, $options) {
     "section-index": $props.sectionIndex
   }, {
     default: _withCtx2(() => [
-      _createCommentVNode3(" Paragraphs with inline math "),
+      _createCommentVNode3(" Interleaved paragraphs and display math "),
       (_openBlock3(true), _createElementBlock3(
         _Fragment2,
         null,
-        _renderList($props.section.paragraphs, (para, pi) => {
+        _renderList($props.section.content, (block, bi) => {
           return _openBlock3(), _createElementBlock3(
             _Fragment2,
-            { key: pi },
+            { key: bi },
             [
-              $setup.isBlockHtml(para) ? (_openBlock3(), _createElementBlock3("div", {
-                key: 0,
-                innerHTML: $setup.renderParagraph(para)
-              }, null, 8, _hoisted_13)) : (_openBlock3(), _createElementBlock3("p", {
+              typeof block === "string" ? (_openBlock3(), _createElementBlock3(
+                _Fragment2,
+                { key: 0 },
+                [
+                  $setup.isBlockHtml(block) ? (_openBlock3(), _createElementBlock3("div", {
+                    key: 0,
+                    innerHTML: $setup.renderParagraph(block)
+                  }, null, 8, _hoisted_13)) : (_openBlock3(), _createElementBlock3("p", {
+                    key: 1,
+                    innerHTML: $setup.renderParagraph(block)
+                  }, null, 8, _hoisted_23))
+                ],
+                64
+                /* STABLE_FRAGMENT */
+              )) : (_openBlock3(), _createBlock2($setup["MathBlock"], {
                 key: 1,
-                innerHTML: $setup.renderParagraph(para)
-              }, null, 8, _hoisted_23))
+                tex: block.tex,
+                id: block.id
+              }, null, 8, ["tex", "id"]))
             ],
             64
             /* STABLE_FRAGMENT */

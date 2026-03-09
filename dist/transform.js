@@ -5,7 +5,7 @@ import {
   cleanRawLatex,
   transformDocument,
   validateOutput
-} from "./chunk-RDKNT5AC.js";
+} from "./chunk-4LCLO5SZ.js";
 import {
   LabelRegistry,
   astToText,

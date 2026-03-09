@@ -1,5 +1,5 @@
 import { Plugin } from 'vite';
-export { b as PaperFigureData, P as PaperSectionData, c as PaperTheoremData } from './output-DTw88a0I.js';
+export { P as PaperFigureData, a as PaperSectionData, b as PaperTheoremData } from './output-zFciSIqc.js';
 
 /**
  * @mkbabb/latex-paper/vite — Vite plugin entry point.

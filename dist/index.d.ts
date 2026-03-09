@@ -1,4 +1,4 @@
-export { b as PaperFigureData, a as PaperLabelInfo, P as PaperSectionData, c as PaperTheoremData } from './output-DTw88a0I.js';
+export { C as ContentBlock, M as MathBlockData, P as PaperFigureData, c as PaperLabelInfo, a as PaperSectionData, b as PaperTheoremData } from './output-zFciSIqc.js';
 
 /** Discriminated union of all LaTeX AST node types. */
 interface TextNode {

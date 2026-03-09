@@ -12,11 +12,26 @@ interface PaperFigureData {
     caption: string;
     label?: string;
 }
+/** A standalone display equation between paragraphs. */
+interface MathBlockData {
+    tex: string;
+    /** Element ID for scroll-to targeting (e.g. "eq-f3"). */
+    id?: string;
+}
+/**
+ * A content block is either a paragraph (HTML string) or a display math block.
+ * Use `typeof block === "string"` to distinguish.
+ */
+type ContentBlock = string | MathBlockData;
 interface PaperSectionData {
     id: string;
     number: string;
     title: string;
-    paragraphs: string[];
+    /**
+     * Interleaved paragraphs and display equations in document order.
+     * Strings are paragraph HTML; MathBlockData are display equations.
+     */
+    content: ContentBlock[];
     theorems?: PaperTheoremData[];
     figures?: PaperFigureData[];
     subsections?: PaperSectionData[];
@@ -39,4 +54,4 @@ interface PaperLabelInfo {
     elementId?: string;
 }
 
-export type { PaperSectionData as P, PaperLabelInfo as a, PaperFigureData as b, PaperTheoremData as c };
+export type { ContentBlock as C, MathBlockData as M, PaperFigureData as P, PaperSectionData as a, PaperTheoremData as b, PaperLabelInfo as c };

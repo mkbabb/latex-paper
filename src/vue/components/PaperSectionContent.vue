@@ -45,13 +45,16 @@ function isBlockHtml(text: string): boolean {
         :depth="depth"
         :section-index="sectionIndex"
     >
-        <!-- Paragraphs with inline math -->
-        <template v-for="(para, pi) in section.paragraphs" :key="pi">
-            <div
-                v-if="isBlockHtml(para)"
-                v-html="renderParagraph(para)"
-            />
-            <p v-else v-html="renderParagraph(para)" />
+        <!-- Interleaved paragraphs and display math -->
+        <template v-for="(block, bi) in section.content" :key="bi">
+            <template v-if="typeof block === 'string'">
+                <div
+                    v-if="isBlockHtml(block)"
+                    v-html="renderParagraph(block)"
+                />
+                <p v-else v-html="renderParagraph(block)" />
+            </template>
+            <MathBlock v-else :tex="block.tex" :id="block.id" />
         </template>
 
         <!-- Figures -->

@@ -30,6 +30,8 @@ export type {
     PaperTheoremData,
     PaperFigureData,
     PaperLabelInfo,
+    MathBlockData,
+    ContentBlock,
 } from "./types/output";
 
 // BibTeX types

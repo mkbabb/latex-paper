@@ -1,0 +1,53 @@
+{
+    "name": "@mkbabb/latex-paper",
+    "version": "0.1.0",
+    "type": "module",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./transform": {
+            "types": "./dist/transform.d.ts",
+            "import": "./dist/transform.js"
+        },
+        "./vite": {
+            "types": "./dist/vite.d.ts",
+            "import": "./dist/vite.js"
+        }
+    },
+    "files": [
+        "dist",
+        "grammar"
+    ],
+    "scripts": {
+        "build": "tsup",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage"
+    },
+    "dependencies": {
+        "@mkbabb/bbnf-lang": "^0.1.1",
+        "@mkbabb/parse-that": "^0.7.1"
+    },
+    "peerDependencies": {
+        "katex": "^0.16",
+        "vite": "^6.0 || ^7.0"
+    },
+    "peerDependenciesMeta": {
+        "katex": {
+            "optional": true
+        },
+        "vite": {
+            "optional": true
+        }
+    },
+    "devDependencies": {
+        "@types/node": "^25.3.5",
+        "katex": "^0.16",
+        "tsup": "^8.0",
+        "typescript": "^5.8",
+        "vite": "^7.0",
+        "vitest": "^3.0"
+    }
+}

@@ -100,7 +100,9 @@ describe("integration: fixtures → PaperSectionData", () => {
         );
         const { sections } = transformDocument(ast, { bibEntries });
         // The paragraph should contain the citation
-        const allText = sections[0].paragraphs.join(" ");
+        const allText = sections[0].content
+            .filter((b): b is string => typeof b === "string")
+            .join(" ");
         expect(allText).toContain("Fourier");
         expect(allText).toContain("1822");
     });

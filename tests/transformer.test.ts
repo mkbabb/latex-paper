@@ -150,6 +150,50 @@ describe("transformDocument", () => {
         expect(sections[0].theorems!.length).toBe(1);
     });
 
+    it("interleaves display math as MathBlockData in content", () => {
+        const ast = parseLatex(
+            "\\begin{document}\n\\chapter{Ch}\nBefore the equation paragraph text.\n\\[\nx^2 + y^2 = z^2\n\\]\nAfter the equation paragraph text.\n\\end{document}",
+        );
+        const { sections } = transformDocument(ast);
+        const content = sections[0].content;
+        // Should have: paragraph, math block, paragraph
+        expect(content.length).toBe(3);
+        expect(typeof content[0]).toBe("string");
+        expect(typeof content[1]).toBe("object");
+        expect(typeof content[2]).toBe("string");
+        if (typeof content[1] === "object") {
+            expect(content[1].tex).toContain("x^2 + y^2 = z^2");
+        }
+    });
+
+    it("assigns label IDs to display math blocks", () => {
+        const ast = parseLatex(
+            "\\begin{document}\n\\chapter{Ch}\nSome intro text for the section.\n\\begin{equation}\n\\label{eq:test}\nE = mc^2\n\\end{equation}\n\\end{document}",
+        );
+        const { sections } = transformDocument(ast);
+        const mathBlock = sections[0].content.find(
+            (b) => typeof b === "object",
+        );
+        expect(mathBlock).toBeDefined();
+        if (typeof mathBlock === "object") {
+            expect(mathBlock.id).toBe("eq-test");
+        }
+    });
+
+    it("resolves eqref cross-references to labeled equations", () => {
+        const ast = parseLatex(
+            "\\begin{document}\n\\chapter{Ch}\n\\begin{equation}\n\\label{eq:euler}\ne^{i\\pi} + 1 = 0\n\\end{equation}\nSee \\eqref{eq:euler} for the identity.\n\\end{document}",
+        );
+        const { sections, labelMap } = transformDocument(ast);
+        // Label should be resolved
+        expect(labelMap["eq:euler"]).toBeDefined();
+        // The paragraph referencing the equation should contain a paper-ref link
+        const refParagraph = sections[0].content.find(
+            (b) => typeof b === "string" && b.includes("paper-ref"),
+        );
+        expect(refParagraph).toBeDefined();
+    });
+
     it("applies callouts", () => {
         const ast = parseLatex(
             "\\begin{document}\n\\chapter{Applications}\nSome text about apps.\n\\end{document}",

@@ -26,6 +26,10 @@ export class LabelRegistry {
     private theoremCounter = 0;
     private figureCounter = 0;
     private equationCounter = 0;
+    /** Current section number string — standalone \label nodes inherit this. */
+    private currentSectionNumber = "";
+    /** Current section type for standalone labels. */
+    private currentSectionType: "section" = "section";
 
     /** Collect all labels from an AST (pass 1). */
     collectLabels(nodes: LatexNode[]): void {
@@ -59,7 +63,14 @@ export class LabelRegistry {
                 if (node.display) this.visitMath(node);
                 break;
             case "label":
-                // Standalone label — associate with current context
+                // Standalone label — associate with current section context
+                if (this.currentSectionNumber && !this.labels.has(node.key)) {
+                    this.labels.set(node.key, {
+                        key: node.key,
+                        number: this.currentSectionNumber,
+                        type: this.currentSectionType,
+                    });
+                }
                 break;
             case "environment":
                 if (node.body) this.collectLabels(node.body);
@@ -114,6 +125,9 @@ export class LabelRegistry {
         } else {
             number = `${this.sectionCounters.chapter}.${this.sectionCounters.section}.${this.sectionCounters.subsection}.${this.sectionCounters.subsubsection}`;
         }
+
+        // Update current section context so standalone labels inherit this number
+        this.currentSectionNumber = number;
 
         // Check for label in the title nodes (rare but possible)
         for (const child of node.title) {

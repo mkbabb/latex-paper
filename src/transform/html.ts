@@ -703,6 +703,10 @@ export class Transformer {
                 return `<u>${arg(0)}</u>`;
             case "paragraph":
                 return `<strong>${arg(0)}</strong> `;
+            case "url": {
+                const url = arg(0);
+                return `<a href="${url}" target="_blank" rel="noopener" class="text-primary hover:underline">${url}</a>`;
+            }
             case "href":
                 return `<a href="${arg(0)}" target="_blank" rel="noopener" class="text-primary hover:underline">${arg(1)}</a>`;
             case "cite": {
@@ -730,10 +734,11 @@ export class Transformer {
                 return `<a class="paper-ref" data-ref="${eqKey}">(${eqInfo.number})</a>`;
             }
             case "hyperref": {
-                // \hyperref[key]{text} — the key is in arg(0), text in arg(1)
-                // But our parser may put the optional arg differently
-                const hKey = node.args[0] ? arg(0).trim() : "";
-                const hText = node.args[1] ? arg(1) : arg(0);
+                // \hyperref[key]{text} — parser puts key in optArgs[0], text in args[0]
+                const hKey = node.optArgs?.[0]
+                    ? this.nodesToHtml(node.optArgs[0]).trim()
+                    : "";
+                const hText = arg(0);
                 if (hKey) {
                     return `<a class="paper-ref" data-ref="${hKey}">${hText}</a>`;
                 }

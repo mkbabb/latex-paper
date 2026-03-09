@@ -117,6 +117,18 @@ export const citeCommand: Parser<CommandNode> = cmd("cite")
         }),
     }));
 
+// ── URL ─────────────────────────────────────────────────────────────
+
+/** Parse \url{url} */
+export const urlCommand: Parser<CommandNode> = cmd("url")
+    .skip(ws)
+    .next(braceBalanced())
+    .map((url) => ({
+        type: "command" as const,
+        name: "url",
+        args: [[{ type: "text" as const, value: url }]],
+    }));
+
 // ── Href ────────────────────────────────────────────────────────────
 
 /** Parse \href{url}{text} */

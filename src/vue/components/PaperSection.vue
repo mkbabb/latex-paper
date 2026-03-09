@@ -14,7 +14,7 @@ const ctx = inject(PAPER_CONTEXT)!;
 </script>
 
 <template>
-    <section :id="id" class="paper-section">
+    <section :id="id" class="paper-section" :style="(depth ?? 0) === 0 && sectionIndex != null ? { '--_section-color': `var(--section-color-${sectionIndex})` } : undefined">
         <div
             class="section-header"
             :class="{

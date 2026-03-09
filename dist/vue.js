@@ -600,7 +600,7 @@ var PaperSection_default = /* @__PURE__ */ _defineComponent4({
 });
 
 // sfc-template:/Users/mkbabb/Programming/latex-paper/src/vue/components/PaperSection.vue?type=template
-import { toDisplayString as _toDisplayString2, createElementVNode as _createElementVNode4, resolveDynamicComponent as _resolveDynamicComponent, withCtx as _withCtx, openBlock as _openBlock2, createBlock as _createBlock, createElementBlock as _createElementBlock2, createCommentVNode as _createCommentVNode2, normalizeClass as _normalizeClass2, renderSlot as _renderSlot2 } from "vue";
+import { toDisplayString as _toDisplayString2, createElementVNode as _createElementVNode4, resolveDynamicComponent as _resolveDynamicComponent, withCtx as _withCtx, openBlock as _openBlock2, createBlock as _createBlock, createElementBlock as _createElementBlock2, createCommentVNode as _createCommentVNode2, normalizeClass as _normalizeClass2, renderSlot as _renderSlot2, normalizeStyle as _normalizeStyle } from "vue";
 var _hoisted_12 = ["id"];
 var _hoisted_22 = { class: "section-number" };
 var _hoisted_32 = ["innerHTML"];
@@ -612,7 +612,8 @@ var _hoisted_52 = { class: "section-body" };
 function render4(_ctx, _cache, $props, $setup, $data, $options) {
   return _openBlock2(), _createElementBlock2("section", {
     id: $props.id,
-    class: "paper-section"
+    class: "paper-section",
+    style: _normalizeStyle(($props.depth ?? 0) === 0 && $props.sectionIndex != null ? { "--_section-color": `var(--section-color-${$props.sectionIndex})` } : void 0)
   }, [
     _createElementVNode4(
       "div",
@@ -648,7 +649,7 @@ function render4(_ctx, _cache, $props, $setup, $data, $options) {
     _createElementVNode4("div", _hoisted_52, [
       _renderSlot2(_ctx.$slots, "default")
     ])
-  ], 8, _hoisted_12);
+  ], 12, _hoisted_12);
 }
 
 // src/vue/components/PaperSection.vue

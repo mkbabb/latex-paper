@@ -90,10 +90,13 @@ describe("environment parsers", () => {
         expect(result!.type).toBe("quote");
     });
 
-    it("skips center environment", () => {
+    it("parses center environment as passthrough", () => {
         const result = environment.parse(
             "\\begin{center}\nsome content\n\\end{center}",
         );
-        expect(result).toBeNull();
+        expect(result).not.toBeNull();
+        expect(result!.type).toBe("environment");
+        expect((result as any).name).toBe("center");
+        expect((result as any).body.length).toBeGreaterThan(0);
     });
 });

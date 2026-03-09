@@ -221,5 +221,12 @@ export function splitOnItem(body: LatexNode[]): LatexNode[][] {
         items.push(current);
     }
 
-    return items;
+    // Filter out items with only whitespace/empty text nodes
+    return items.filter((item) =>
+        item.some(
+            (node) =>
+                node.type !== "text" ||
+                node.value.trim().length > 0,
+        ),
+    );
 }

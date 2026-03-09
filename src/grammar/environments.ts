@@ -161,7 +161,6 @@ function parseQuoteEnv(): Parser<QuoteNode> {
 // ── Raw/skip environments ───────────────────────────────────────────
 
 const SKIP_ENVS = new Set([
-    "center",
     "tabular",
     "tabular*",
     "table",
@@ -204,6 +203,15 @@ export const environment: Parser<LatexNode | null> = string("\\begin")
 
         // Quote
         if (envName === "quote" || envName === "quotation") return parseQuoteEnv();
+
+        // Center (passthrough — parse body as nodes)
+        if (envName === "center") {
+            return nodesUntilEnd(envName).map((body) => ({
+                type: "environment" as const,
+                name: envName,
+                body,
+            }));
+        }
 
         // Document (parse body normally)
         if (envName === "document") {

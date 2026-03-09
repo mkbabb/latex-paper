@@ -7,11 +7,11 @@ import { parseBibToMap } from "../src/bibtex/parser";
 
 const PAPER_TEX = resolve(
     import.meta.dirname,
-    "../../fourier_analysis/paper/fourier_paper.tex",
+    "../../fourier-analysis/paper/fourier_paper.tex",
 );
 const PAPER_BIB = resolve(
     import.meta.dirname,
-    "../../fourier_analysis/paper/fourier_paper.bib",
+    "../../fourier-analysis/paper/fourier_paper.bib",
 );
 
 const hasPaper = existsSync(PAPER_TEX);

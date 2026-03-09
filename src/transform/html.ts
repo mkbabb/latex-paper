@@ -453,6 +453,9 @@ export class Transformer {
             }
         }
 
+        // Generate summaries
+        this.generateSummaries(topLevel);
+
         // Clean empty subsections
         this.cleanEmpty(topLevel);
 
@@ -495,11 +498,38 @@ export class Transformer {
     /** Build the public labelMap from the registry. */
     private buildLabelMap(): void {
         for (const [key, info] of this.labels.all()) {
+            // Generate element-level IDs for precise scroll targeting
+            const elementId =
+                info.type === "section"
+                    ? undefined // sections already have their own IDs
+                    : key.replace(/:/g, "-"); // thm:sturm_proof → thm-sturm_proof
             this.labelMap[key] = {
                 number: info.number,
                 type: info.type,
                 sectionId: info.sectionId ?? "",
+                ...(elementId && { elementId }),
             };
+        }
+    }
+
+    /** Generate content summary strings for each section (recursive). */
+    private generateSummaries(sections: PaperSectionData[]): void {
+        for (const section of sections) {
+            if (section.subsections) this.generateSummaries(section.subsections);
+
+            const counts: Record<string, number> = {};
+            function countItems(s: PaperSectionData) {
+                for (const t of s.theorems ?? []) {
+                    counts[t.type] = (counts[t.type] ?? 0) + 1;
+                }
+                for (const sub of s.subsections ?? []) countItems(sub);
+            }
+            countItems(section);
+
+            const parts = Object.entries(counts)
+                .map(([type, n]) => `${n} ${type}${n > 1 ? "s" : ""}`)
+                .join(", ");
+            if (parts) section.summary = parts;
         }
     }
 
@@ -617,9 +647,13 @@ export class Transformer {
             }
         }
 
+        // Look up theorem number from label registry
+        const number = label ? this.labels.resolve(label)?.number : undefined;
+
         return {
             type: node.envType as PaperTheoremData["type"],
             ...(node.name && { name: this.nodesToHtml(node.name) }),
+            ...(number && { number }),
             body,
             ...(mathBlocks.length > 0 && { math: mathBlocks }),
             ...(label && { label }),

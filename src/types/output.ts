@@ -8,6 +8,8 @@ export interface PaperTheoremData {
         | "aside"
         | "example";
     name?: string;
+    /** Theorem number (e.g., "1.3") from the label registry. */
+    number?: string;
     body: string;
     math?: string[];
     label?: string;
@@ -28,6 +30,8 @@ export interface PaperSectionData {
     figures?: PaperFigureData[];
     subsections?: PaperSectionData[];
     callout?: { text: string; link: string };
+    /** Summary of content counts (e.g., "3 theorems, 2 definitions"). */
+    summary?: string;
 }
 
 /** Maps label keys to their resolved location in the paper. */
@@ -38,4 +42,6 @@ export interface PaperLabelInfo {
     type: "section" | "theorem" | "figure" | "equation";
     /** Section ID (slug) containing this label */
     sectionId: string;
+    /** Element-level ID for precise scroll targeting (e.g. "thm-sturm_proof") */
+    elementId?: string;
 }

@@ -1,0 +1,99 @@
+import { BibEntry, LatexNode } from './index.js';
+export { CommandNode, CommentNode, DescriptionNode, EnvironmentNode, FigureNode, GroupNode, LabelInfo, LabelNode, LabelRegistry, ListNode, MathNode, ParagraphBreakNode, ProofNode, QuoteNode, SectionNode, TextNode, TheoremNode, astToText, parseBibString, parseBibToMap, parseInlineString, parseLatex } from './index.js';
+import { P as PaperSectionData, a as PaperLabelInfo } from './output-DTw88a0I.js';
+export { b as PaperFigureData, c as PaperTheoremData } from './output-DTw88a0I.js';
+
+/**
+ * AST → HTML transformer with configurable macros and callouts.
+ *
+ * Text nodes from braceBalanced() contain raw LaTeX (accents, dashes,
+ * nested commands, etc.). cleanRawLatex() processes these patterns,
+ * mirroring the old regex-based parser's cleanProseSegment().
+ */
+
+interface TransformOptions {
+    /** KaTeX macros (merged with defaults). */
+    macros?: Record<string, string>;
+    /** Section callout mapping: section id → { text, link }. */
+    callouts?: Record<string, {
+        text: string;
+        link: string;
+    }>;
+    /** Custom math renderer. Default: KaTeX if available. */
+    renderMath?: (tex: string, displayMode: boolean) => string;
+    /** Bibliography entries for \cite resolution. */
+    bibEntries?: Map<string, BibEntry>;
+}
+/** Default KaTeX macros used in the fourier_paper. */
+declare const DEFAULT_MACROS: Record<string, string>;
+/**
+ * Clean residual LaTeX patterns from text node content.
+ *
+ * With braceContent() parsing command arguments through the inline parser,
+ * most LaTeX (accents, dashes, quotes, formatting, refs) is properly handled
+ * in the AST. This function catches residual patterns that may appear in
+ * text nodes from opaque sources (e.g. braceBalanced() for keys/filenames)
+ * or edge cases the parser doesn't cover.
+ *
+ * Math segments ($...$) are preserved verbatim.
+ *
+ * @param labelResolver Optional function to resolve \ref{key} → number string.
+ */
+declare function cleanRawLatex(text: string, labelResolver?: (key: string) => string | undefined): string;
+interface ValidationIssue {
+    path: string;
+    text: string;
+    pattern: string;
+    match: string;
+}
+/**
+ * Scan transformed output for suspicious unprocessed LaTeX patterns.
+ * Returns a list of issues found.
+ */
+declare function validateOutput(sections: PaperSectionData[]): ValidationIssue[];
+/**
+ * Transform a LaTeX AST into structured PaperSectionData[].
+ */
+declare class Transformer {
+    private options;
+    private bibEntries;
+    private labels;
+    /** After transform(), contains label key → location mapping. */
+    labelMap: Record<string, PaperLabelInfo>;
+    constructor(options?: TransformOptions);
+    /** Transform a full AST (typically from parseLatex) into sections. */
+    transform(nodes: LatexNode[]): PaperSectionData[];
+    private buildSectionHierarchy;
+    /** Recursively tag labels found in AST nodes with a section ID. */
+    private tagLabelsInNodes;
+    /** Build the public labelMap from the registry. */
+    private buildLabelMap;
+    /** Generate content summary strings for each section (recursive). */
+    private generateSummaries;
+    private cleanEmpty;
+    /** Extract paragraphs from body nodes (text between theorem/figure/math envs). */
+    private extractParagraphs;
+    /** Extract theorems from body nodes. */
+    private extractTheorems;
+    /** Extract figures from body nodes. */
+    private extractFigures;
+    private transformTheorem;
+    /** Convert a single AST node to HTML string. */
+    nodeToHtml(node: LatexNode): string;
+    private commandToHtml;
+    private listToHtml;
+    private descriptionToHtml;
+    /** Convert an array of nodes to HTML. */
+    nodesToHtml(nodes: LatexNode[]): string;
+}
+/** Result of transformDocument including label map for cross-references. */
+interface TransformResult {
+    sections: PaperSectionData[];
+    labelMap: Record<string, PaperLabelInfo>;
+}
+/**
+ * Full pipeline: parse LaTeX AST → PaperSectionData[] + label map.
+ */
+declare function transformDocument(nodes: LatexNode[], options?: TransformOptions): TransformResult;
+
+export { BibEntry, DEFAULT_MACROS, LatexNode, PaperLabelInfo, PaperSectionData, type TransformOptions, type TransformResult, Transformer, type ValidationIssue, cleanRawLatex, transformDocument, validateOutput };

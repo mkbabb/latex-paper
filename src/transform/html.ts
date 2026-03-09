@@ -1,21 +1,12 @@
 /**
  * AST → HTML transformer with configurable macros and callouts.
- *
- * Text nodes from braceBalanced() contain raw LaTeX (accents, dashes,
- * nested commands, etc.). cleanRawLatex() processes these patterns,
- * mirroring the old regex-based parser's cleanProseSegment().
  */
 
 import type {
     LatexNode,
-    SectionNode,
     TheoremNode,
     ListNode,
     DescriptionNode,
-    FigureNode,
-    ProofNode,
-    QuoteNode,
-    MathNode,
     CommandNode,
 } from "../types/ast";
 import type {
@@ -23,11 +14,17 @@ import type {
     PaperTheoremData,
     PaperFigureData,
     PaperLabelInfo,
+    ContentBlock,
 } from "../types/output";
 import type { BibEntry } from "../types/bibtex";
-import { ACCENT_MAPS, SYMBOL_MAP } from "../utils/accents";
 import { LabelRegistry } from "./labels";
 import { astToText } from "../grammar/document";
+import { cleanRawLatex, slugify } from "./clean";
+
+// Re-export sub-modules for backwards compatibility
+export { cleanRawLatex } from "./clean";
+export { validateOutput } from "./validate";
+export type { ValidationIssue } from "./validate";
 
 export interface TransformOptions {
     /** KaTeX macros (merged with defaults). */
@@ -42,246 +39,6 @@ export interface TransformOptions {
 
 /** Default KaTeX macros used in the fourier_paper. */
 export const DEFAULT_MACROS: Record<string, string> = {};
-
-// ── Raw LaTeX text cleanup ──────────────────────────────────────────
-
-/**
- * Apply accent command replacements to raw text.
- * Handles braced (\"{a}) and unbraced (\"a) forms.
- */
-function replaceAccents(text: string): string {
-    for (const [cmd, map] of Object.entries(ACCENT_MAPS)) {
-        if (Object.keys(map).length === 0) continue;
-        const escaped = cmd.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        // Braced form: \cmd{char}
-        text = text.replace(
-            new RegExp(`\\\\${escaped}\\{([a-zA-Z])\\}`, "g"),
-            (_, ch: string) => map[ch] ?? ch,
-        );
-        // Unbraced form: \cmd char
-        text = text.replace(
-            new RegExp(`\\\\${escaped}([a-zA-Z])`, "g"),
-            (_, ch: string) => map[ch] ?? ch,
-        );
-    }
-    return text;
-}
-
-/**
- * Replace symbol commands (\infty, \implies, etc.) in raw text.
- */
-function replaceSymbols(text: string): string {
-    // Sort by length descending to match longest first
-    const names = Object.keys(SYMBOL_MAP).sort((a, b) => b.length - a.length);
-    for (const name of names) {
-        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        text = text.replace(
-            new RegExp(`\\\\${escaped}(?![a-zA-Z])`, "g"),
-            SYMBOL_MAP[name],
-        );
-    }
-    return text;
-}
-
-/**
- * Clean residual LaTeX patterns from text node content.
- *
- * With braceContent() parsing command arguments through the inline parser,
- * most LaTeX (accents, dashes, quotes, formatting, refs) is properly handled
- * in the AST. This function catches residual patterns that may appear in
- * text nodes from opaque sources (e.g. braceBalanced() for keys/filenames)
- * or edge cases the parser doesn't cover.
- *
- * Math segments ($...$) are preserved verbatim.
- *
- * @param labelResolver Optional function to resolve \ref{key} → number string.
- */
-export function cleanRawLatex(
-    text: string,
-    labelResolver?: (key: string) => string | undefined,
-): string {
-    // Split on $...$ boundaries. Odd-indexed segments are math.
-    const parts = text.split(/(\$[^$]*\$)/g);
-    for (let i = 0; i < parts.length; i++) {
-        if (i % 2 === 1) continue; // skip math segments
-        parts[i] = cleanProseSegment(parts[i], labelResolver);
-    }
-    return parts.join("").replace(/  +/g, " ");
-}
-
-/**
- * Clean residual LaTeX patterns from a prose (non-math) text segment.
- *
- * Most patterns are now handled by the combinator parser (braceContent).
- * This only processes patterns that may still appear in text nodes:
- * - Escaped specials (\&, \#, etc.) from the plainText parser
- * - Residual braces from brace-balanced content
- * - Tilde → space (if not caught by tilde parser)
- * - Spacing commands that might appear in raw text
- */
-function cleanProseSegment(
-    text: string,
-    labelResolver?: (key: string) => string | undefined,
-): string {
-    // Accents → Unicode (fallback for any unprocessed accents)
-    text = replaceAccents(text);
-
-    // Dashes (fallback — parser handles these, but raw text may still have them)
-    text = text.replace(/---/g, "\u2014");
-    text = text.replace(/--/g, "\u2013");
-
-    // Smart quotes (fallback)
-    text = text.replace(/``/g, "\u201C");
-    text = text.replace(/''/g, "\u201D");
-
-    // Symbols → Unicode (fallback)
-    text = replaceSymbols(text);
-
-    // Refs: resolve \ref{key} via label registry, producing clickable links
-    const resolveRef = (key: string) => labelResolver?.(key) ?? "";
-    const refLink = (key: string, display: string) =>
-        `<a class="paper-ref" data-ref="${key}">${display}</a>`;
-
-    text = text.replace(
-        /(Chapters?|Sections?|Theorem|Figure|Lemma|Definition|Proposition|Corollary)[~\s]+\\ref\{([^}]*)\}/g,
-        (_, prefix: string, key: string) => {
-            const num = resolveRef(key);
-            return num ? refLink(key, `${prefix} ${num}`) : prefix;
-        },
-    );
-    text = text.replace(/\\S\s*\\ref\{([^}]*)\}/g, (_, key: string) => {
-        const num = resolveRef(key);
-        return num ? refLink(key, `\u00a7${num}`) : "\u00a7";
-    });
-    text = text.replace(/\\eqref\{([^}]*)\}/g, (_, key: string) => {
-        const num = resolveRef(key);
-        return num ? refLink(key, `(${num})`) : "";
-    });
-    text = text.replace(
-        /\\hyperref\[([^\]]*)\]\{([^}]*)\}/g,
-        (_, key: string, display: string) => refLink(key, display),
-    );
-    text = text.replace(/\\ref\{([^}]*)\}/g, (_, key: string) => {
-        const num = resolveRef(key);
-        return num ? refLink(key, num) : "";
-    });
-    text = text.replace(/\\label\{[^}]*\}/g, "");
-
-    // Tilde → non-breaking space
-    text = text.replace(/~/g, " ");
-
-    // Spacing commands → space
-    text = text.replace(/\\[,;:!]/g, " ");
-    text = text.replace(/\\q?quad/g, " ");
-    text = text.replace(/\\\\/g, " ");
-    text = text.replace(/\\(?:newline|thinspace)(?![a-zA-Z])/g, " ");
-
-    // Skip/strip commands
-    text = text.replace(/\\(?:noindent|hfill|centering)\s*/g, "");
-    text = text.replace(/\\(?:medskip|smallskip|bigskip|vfill)\s*/g, "");
-    text = text.replace(/\\vspace\*?\{[^}]*\}/g, "");
-
-    // Escaped specials
-    text = text.replace(/\\@/g, "");
-    text = text.replace(/\\&/g, "&amp;");
-    text = text.replace(/\\([#$%_{}])/g, "$1");
-
-    // Strip remaining braces (after all command processing)
-    text = text.replace(/[{}]/g, "");
-
-    return text;
-}
-
-/** Slugify a string for HTML id generation. */
-function slugify(text: string): string {
-    return text
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "");
-}
-
-// ── Validation ──────────────────────────────────────────────────────
-
-/** Patterns that indicate unprocessed LaTeX in output. */
-const SUSPICIOUS_PATTERNS: Array<{ pattern: RegExp; description: string }> = [
-    { pattern: /\\['"` ^~]\{[a-zA-Z]\}/, description: "Unprocessed braced accent" },
-    { pattern: /\\['"` ^~][a-zA-Z]/, description: "Unprocessed unbraced accent" },
-    { pattern: /\\c\{[a-zA-Z]\}/, description: "Unprocessed cedilla" },
-    { pattern: /\\text(?:it|bf|tt)\{/, description: "Unprocessed formatting command" },
-    { pattern: /\\emph\{/, description: "Unprocessed \\emph" },
-    { pattern: /\\(?:section|chapter|subsection)\*?\{/, description: "Unprocessed sectioning command" },
-    { pattern: /\\begin\{/, description: "Unprocessed \\begin" },
-    { pattern: /\\end\{/, description: "Unprocessed \\end" },
-    { pattern: /(?<!\$[^$]*)\\(?:implies|iff|infty|ldots|cdots|dots|Rightarrow|Leftarrow|rightarrow|leftrightarrow)(?![a-zA-Z])(?![^$]*\$)/, description: "Unprocessed symbol command in prose" },
-    { pattern: /``/, description: "Unprocessed left double quote" },
-    { pattern: /''/, description: "Unprocessed right double quote" },
-    { pattern: /(?<![- ])---(?![ -])/, description: "Unprocessed em-dash" },
-];
-
-export interface ValidationIssue {
-    path: string;
-    text: string;
-    pattern: string;
-    match: string;
-}
-
-/**
- * Scan transformed output for suspicious unprocessed LaTeX patterns.
- * Returns a list of issues found.
- */
-export function validateOutput(sections: PaperSectionData[]): ValidationIssue[] {
-    const issues: ValidationIssue[] = [];
-
-    function scanText(text: string, path: string): void {
-        // Strip math segments ($...$) before scanning — LaTeX inside math is valid
-        const prose = text.replace(/\$[^$]*\$/g, "");
-        for (const { pattern, description } of SUSPICIOUS_PATTERNS) {
-            const match = prose.match(pattern);
-            if (match) {
-                issues.push({
-                    path,
-                    text: prose.substring(
-                        Math.max(0, match.index! - 20),
-                        Math.min(prose.length, match.index! + match[0].length + 20),
-                    ),
-                    pattern: description,
-                    match: match[0],
-                });
-            }
-        }
-    }
-
-    function scanSection(section: PaperSectionData, prefix: string): void {
-        const path = `${prefix}/${section.id}`;
-        scanText(section.title, `${path}/title`);
-        for (let i = 0; i < section.paragraphs.length; i++) {
-            scanText(section.paragraphs[i], `${path}/paragraph[${i}]`);
-        }
-        if (section.theorems) {
-            for (let i = 0; i < section.theorems.length; i++) {
-                const thm = section.theorems[i];
-                if (thm.name) scanText(thm.name, `${path}/theorem[${i}]/name`);
-                scanText(thm.body, `${path}/theorem[${i}]/body`);
-            }
-        }
-        if (section.figures) {
-            for (let i = 0; i < section.figures.length; i++) {
-                scanText(section.figures[i].caption, `${path}/figure[${i}]/caption`);
-            }
-        }
-        if (section.subsections) {
-            for (const sub of section.subsections) {
-                scanSection(sub, path);
-            }
-        }
-    }
-
-    for (const section of sections) {
-        scanSection(section, "");
-    }
-
-    return issues;
-}
 
 // ── Transformer ─────────────────────────────────────────────────────
 
@@ -365,7 +122,7 @@ export class Transformer {
         for (const range of ranges) {
             const bodyNodes = nodes.slice(range.startIdx, range.endIdx);
             const id = slugify(range.title);
-            const paragraphs = this.extractParagraphs(bodyNodes);
+            const content = this.extractContent(bodyNodes);
             const theorems = this.extractTheorems(bodyNodes);
             const figures = this.extractFigures(bodyNodes);
             const callout = callouts[id];
@@ -382,7 +139,7 @@ export class Transformer {
                     id,
                     number: String(chapterNum),
                     title: range.title,
-                    paragraphs,
+                    content,
                     ...(theorems.length > 0 && { theorems }),
                     ...(figures.length > 0 && { figures }),
                     subsections: [],
@@ -399,7 +156,7 @@ export class Transformer {
                         id,
                         number: String(chapterNum),
                         title: range.title,
-                        paragraphs,
+                        content,
                         ...(theorems.length > 0 && { theorems }),
                         ...(figures.length > 0 && { figures }),
                         ...(callout && { callout }),
@@ -411,7 +168,7 @@ export class Transformer {
                         id,
                         number: `${chapterNum}.${sectionNum}`,
                         title: range.title,
-                        paragraphs,
+                        content,
                         ...(theorems.length > 0 && { theorems }),
                         ...(figures.length > 0 && { figures }),
                         subsections: [],
@@ -427,7 +184,7 @@ export class Transformer {
                         id,
                         number: `${chapterNum}.${sectionNum}`,
                         title: range.title,
-                        paragraphs,
+                        content,
                         ...(theorems.length > 0 && { theorems }),
                         ...(figures.length > 0 && { figures }),
                         subsections: [],
@@ -443,7 +200,7 @@ export class Transformer {
                             id,
                             number: `${chapterNum}.${sectionNum}.${subsectionNum}`,
                             title: range.title,
-                            paragraphs,
+                            content,
                             ...(theorems.length > 0 && { theorems }),
                             ...(figures.length > 0 && { figures }),
                             ...(callout && { callout }),
@@ -543,28 +300,43 @@ export class Transformer {
         }
     }
 
-    /** Extract paragraphs from body nodes (text between theorem/figure/math envs). */
-    private extractParagraphs(nodes: LatexNode[]): string[] {
-        const paragraphs: string[] = [];
+    /**
+     * Extract interleaved paragraphs and display math from body nodes.
+     * Returns ContentBlock[]: strings are paragraph HTML, MathBlockData are equations.
+     */
+    private extractContent(nodes: LatexNode[]): ContentBlock[] {
+        const content: ContentBlock[] = [];
         let current: string[] = [];
 
         const flush = () => {
             const text = current.join("").replace(/  +/g, " ").trim();
             if (text.length > 10) {
-                paragraphs.push(text);
+                content.push(text);
             }
             current = [];
         };
 
         for (const node of nodes) {
-            // Skip nodes that are extracted separately
+            // Skip nodes that are extracted separately (theorems, figures, proofs)
             if (
                 node.type === "theorem" ||
                 node.type === "figure" ||
                 node.type === "proof" ||
-                (node.type === "math" && node.display) ||
                 node.type === "section"
             ) {
+                continue;
+            }
+
+            // Display math → flush text, emit math block with label ID
+            if (node.type === "math" && node.display) {
+                flush();
+                const source = node.rawValue ?? node.value;
+                const labelMatch = source.match(/\\label\{([^}]+)\}/);
+                let id: string | undefined;
+                if (labelMatch) {
+                    id = labelMatch[1].replace(/:/g, "-");
+                }
+                content.push({ tex: node.value, ...(id && { id }) });
                 continue;
             }
 
@@ -577,7 +349,7 @@ export class Transformer {
         }
 
         flush();
-        return paragraphs;
+        return content;
     }
 
     /** Extract theorems from body nodes. */

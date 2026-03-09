@@ -63,9 +63,9 @@ export function mathEnvBody(
     envName: string,
 ): Parser<MathNode> {
     return rawUntilEnd(envName).map((raw) => {
-        let value = raw.trim();
-        // Remove \label{...}
-        value = value.replace(/\\label\{[^}]*\}/g, "").trim();
+        const rawValue = raw.trim();
+        // Remove \label{...} for rendering
+        let value = rawValue.replace(/\\label\{[^}]*\}/g, "").trim();
         // Wrap align/align* in aligned for KaTeX
         if (envName === "align" || envName === "align*") {
             value = `\\begin{aligned} ${value} \\end{aligned}`;
@@ -74,6 +74,7 @@ export function mathEnvBody(
             type: "math" as const,
             value,
             display: true,
+            rawValue,
         };
     });
 }

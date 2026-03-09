@@ -479,9 +479,9 @@ export class Transformer {
                     if (info) info.sectionId = sectionId;
                 }
             } else if (node.type === "math" && node.display) {
-                // Check for \label{...} in math content
-                const m = node.value.match(/\\label\{([^}]+)\}/);
-                if (m) {
+                // Check for \label{...} in math content (use rawValue to find stripped labels)
+                const source = node.rawValue ?? node.value;
+                for (const m of source.matchAll(/\\label\{([^}]+)\}/g)) {
                     const info = this.labels.resolve(m[1]);
                     if (info) info.sectionId = sectionId;
                 }

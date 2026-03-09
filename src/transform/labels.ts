@@ -172,18 +172,24 @@ export class LabelRegistry {
     }
 
     private visitMath(node: MathNode): void {
-        this.equationCounter++;
         const chNum = this.sectionCounters.chapter || 1;
-        const number = `${chNum}.${this.equationCounter}`;
+        const source = node.rawValue ?? node.value;
 
-        // Check for \label{...} inside the math content
-        const labelMatch = node.value.match(/\\label\{([^}]+)\}/);
-        if (labelMatch) {
-            this.labels.set(labelMatch[1], {
-                key: labelMatch[1],
-                number,
-                type: "equation",
-            });
+        // Find all \label{...} in the math content
+        const matches = [...source.matchAll(/\\label\{([^}]+)\}/g)];
+        if (matches.length > 0) {
+            for (const m of matches) {
+                this.equationCounter++;
+                const number = `${chNum}.${this.equationCounter}`;
+                this.labels.set(m[1], {
+                    key: m[1],
+                    number,
+                    type: "equation",
+                });
+            }
+        } else {
+            // Unlabeled display math still increments the counter once
+            this.equationCounter++;
         }
     }
 }

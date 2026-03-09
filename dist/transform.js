@@ -5,7 +5,7 @@ import {
   cleanRawLatex,
   transformDocument,
   validateOutput
-} from "./chunk-QVXCDP6U.js";
+} from "./chunk-RDKNT5AC.js";
 import {
   LabelRegistry,
   astToText,
@@ -13,7 +13,7 @@ import {
   parseBibToMap,
   parseInlineString,
   parseLatex
-} from "./chunk-DF6BX5MT.js";
+} from "./chunk-O3YJJZOY.js";
 export {
   DEFAULT_MACROS,
   LabelRegistry,

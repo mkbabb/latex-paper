@@ -9,6 +9,8 @@ interface MathNode {
     type: "math";
     value: string;
     display: boolean;
+    /** Original content before label stripping — used by label collection. */
+    rawValue?: string;
 }
 interface CommandNode {
     type: "command";

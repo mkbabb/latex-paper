@@ -1,10 +1,10 @@
 import {
   Transformer
-} from "./chunk-QVXCDP6U.js";
+} from "./chunk-RDKNT5AC.js";
 import {
   parseBibToMap,
   parseLatex
-} from "./chunk-DF6BX5MT.js";
+} from "./chunk-O3YJJZOY.js";
 
 // src/vite.ts
 import { readFileSync } from "fs";

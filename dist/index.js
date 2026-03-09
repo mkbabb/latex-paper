@@ -6,7 +6,7 @@ import {
   parseBibToMap,
   parseInlineString,
   parseLatex
-} from "./chunk-DF6BX5MT.js";
+} from "./chunk-O3YJJZOY.js";
 export {
   LabelRegistry,
   astToText,

@@ -156,7 +156,11 @@ function splitOnItem(body) {
   if (current.length > 0) {
     items.push(current);
   }
-  return items;
+  return items.filter(
+    (item) => item.some(
+      (node) => node.type !== "text" || node.value.trim().length > 0
+    )
+  );
 }
 
 // src/grammar/text.ts
@@ -392,15 +396,16 @@ var inlineMathParen = string3("\\(").next(regex3(/[\s\S]*?(?=\\\))/)).skip(strin
 }));
 function mathEnvBody(envName) {
   return rawUntilEnd(envName).map((raw) => {
-    let value = raw.trim();
-    value = value.replace(/\\label\{[^}]*\}/g, "").trim();
+    const rawValue = raw.trim();
+    let value = rawValue.replace(/\\label\{[^}]*\}/g, "").trim();
     if (envName === "align" || envName === "align*") {
       value = `\\begin{aligned} ${value} \\end{aligned}`;
     }
     return {
       type: "math",
       value,
-      display: true
+      display: true,
+      rawValue
     };
   });
 }
@@ -641,7 +646,6 @@ function parseQuoteEnv() {
   }));
 }
 var SKIP_ENVS = /* @__PURE__ */ new Set([
-  "center",
   "tabular",
   "tabular*",
   "table",
@@ -666,6 +670,13 @@ var environment = string5("\\begin").skip(ws).next(braceBalanced()).chain((envNa
   if (envName === "figure" || envName === "figure*") return parseFigureEnv();
   if (envName === "proof") return parseProofEnv();
   if (envName === "quote" || envName === "quotation") return parseQuoteEnv();
+  if (envName === "center") {
+    return nodesUntilEnd(envName).map((body) => ({
+      type: "environment",
+      name: envName,
+      body
+    }));
+  }
   if (envName === "document") {
     return nodesUntilEnd(envName).map((body) => ({
       type: "environment",
@@ -1021,16 +1032,21 @@ var LabelRegistry = class {
     }
   }
   visitMath(node) {
-    this.equationCounter++;
     const chNum = this.sectionCounters.chapter || 1;
-    const number = `${chNum}.${this.equationCounter}`;
-    const labelMatch = node.value.match(/\\label\{([^}]+)\}/);
-    if (labelMatch) {
-      this.labels.set(labelMatch[1], {
-        key: labelMatch[1],
-        number,
-        type: "equation"
-      });
+    const source = node.rawValue ?? node.value;
+    const matches = [...source.matchAll(/\\label\{([^}]+)\}/g)];
+    if (matches.length > 0) {
+      for (const m of matches) {
+        this.equationCounter++;
+        const number = `${chNum}.${this.equationCounter}`;
+        this.labels.set(m[1], {
+          key: m[1],
+          number,
+          type: "equation"
+        });
+      }
+    } else {
+      this.equationCounter++;
     }
   }
 };
@@ -1045,4 +1061,4 @@ export {
   parseBibToMap,
   LabelRegistry
 };
-//# sourceMappingURL=chunk-DF6BX5MT.js.map
+//# sourceMappingURL=chunk-O3YJJZOY.js.map

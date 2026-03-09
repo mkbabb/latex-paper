@@ -3,7 +3,7 @@ import {
   LabelRegistry,
   SYMBOL_MAP,
   astToText
-} from "./chunk-DF6BX5MT.js";
+} from "./chunk-O3YJJZOY.js";
 
 // src/transform/html.ts
 var DEFAULT_MACROS = {};
@@ -307,8 +307,8 @@ var Transformer = class {
           if (info) info.sectionId = sectionId;
         }
       } else if (node.type === "math" && node.display) {
-        const m = node.value.match(/\\label\{([^}]+)\}/);
-        if (m) {
+        const source = node.rawValue ?? node.value;
+        for (const m of source.matchAll(/\\label\{([^}]+)\}/g)) {
           const info = this.labels.resolve(m[1]);
           if (info) info.sectionId = sectionId;
         }
@@ -591,4 +591,4 @@ export {
   Transformer,
   transformDocument
 };
-//# sourceMappingURL=chunk-QVXCDP6U.js.map
+//# sourceMappingURL=chunk-RDKNT5AC.js.map

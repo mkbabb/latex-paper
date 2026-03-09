@@ -275,7 +275,7 @@ function useScrollTo(options) {
       if (Math.abs(absoluteTop - lastY) < 1 && attempts > 2) {
         scroller.scrollTo({
           top: Math.max(0, absoluteTop - scrollOffset),
-          behavior: "instant"
+          behavior: "smooth"
         });
         return;
       }

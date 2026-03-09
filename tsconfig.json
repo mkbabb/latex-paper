@@ -17,6 +17,6 @@
         "resolveJsonModule": true,
         "types": ["node"]
     },
-    "include": ["src/**/*.ts"],
+    "include": ["src/**/*.ts", "src/**/*.vue"],
     "exclude": ["node_modules", "dist", "tests"]
 }

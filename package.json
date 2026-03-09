@@ -30,7 +30,8 @@
         "build": "tsup && vue-tsc -p tsconfig.vue.json",
         "test": "vitest run",
         "test:watch": "vitest",
-        "test:coverage": "vitest run --coverage"
+        "test:coverage": "vitest run --coverage",
+        "prepare": "npm run build"
     },
     "dependencies": {
         "@mkbabb/bbnf-lang": "^0.1.1",

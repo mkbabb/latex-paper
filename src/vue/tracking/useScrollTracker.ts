@@ -195,5 +195,14 @@ export function useScrollTracker<T extends TreeNode>(
         });
     }
 
-    return { activeId, activeRootId };
+    /** Clear stale visibility state and force position recalculation. */
+    function forceRecalculate() {
+        sectionVisibility.clear();
+        // Run scroll fallback synchronously to immediately pick up correct section
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = 0;
+        onScroll();
+    }
+
+    return { activeId, activeRootId, forceRecalculate };
 }

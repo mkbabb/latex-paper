@@ -50,7 +50,7 @@ export function usePaperReader(options?: {
     );
 
     // Scroll tracking
-    const { activeId, activeRootId } = useScrollTracker(
+    const { activeId, activeRootId, forceRecalculate } = useScrollTracker(
         treeNodes,
         treeIndex,
         visibleCount,
@@ -86,6 +86,7 @@ export function usePaperReader(options?: {
         activeId,
         activeRootId,
         scrollTo,
+        forceRecalculate,
         renderInline,
         renderDisplay,
         renderTitle,

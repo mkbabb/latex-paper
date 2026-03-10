@@ -2,16 +2,35 @@ import { nextTick } from "vue";
 import type { ScrollToOptions } from "./types";
 
 /**
- * Scroll-to-element with rAF retry, force-loading all content if needed.
+ * Scroll-to-element with rAF retry.
+ * When a treeIndex is provided, loads only up to the target section's root index + buffer
+ * instead of force-loading all content.
  */
 export function useScrollTo(options: ScrollToOptions) {
     const { scrollContainer, totalCount, visibleCount } = options;
     const scrollOffset = options.scrollOffset ?? 16;
     const maxAttempts = options.maxAttempts ?? 60;
+    const treeIndex = options.treeIndex;
+
+    function ensureTargetLoaded(id: string) {
+        if (treeIndex) {
+            const entry = treeIndex.get(id);
+            if (entry) {
+                // Load up to the target's root section + 1 buffer
+                const needed = entry.rootIndex + 2;
+                visibleCount.value = Math.max(
+                    visibleCount.value,
+                    Math.min(needed, totalCount),
+                );
+                return;
+            }
+        }
+        // Fallback: load everything
+        visibleCount.value = totalCount;
+    }
 
     function scrollTo(id: string) {
-        // Force-load all content so the target element exists
-        visibleCount.value = totalCount;
+        ensureTargetLoaded(id);
 
         let attempts = 0;
         let lastY = -1;

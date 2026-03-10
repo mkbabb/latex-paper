@@ -52,14 +52,25 @@ export function useScrollTracker<T extends TreeNode>(
         if (found) activeId.value = found;
     }
 
-    /** Collect all node IDs in tree order (depth-first). */
-    function collectIds(list: T[], out: string[] = []): string[] {
-        for (const node of list) {
-            out.push(node.id);
-            const children = getChildren(node);
-            if (children) collectIds(children, out);
+    /** Collect all node IDs in tree order (depth-first). Cached. */
+    let cachedIds: string[] | null = null;
+    function collectIds(list: T[]): string[] {
+        if (cachedIds) return cachedIds;
+        const out: string[] = [];
+        function walk(nodes: T[]) {
+            for (const node of nodes) {
+                out.push(node.id);
+                const children = getChildren(node);
+                if (children) walk(children);
+            }
         }
+        walk(list);
+        cachedIds = out;
         return out;
+    }
+
+    function invalidateIdCache() {
+        cachedIds = null;
     }
 
     /**
@@ -163,6 +174,7 @@ export function useScrollTracker<T extends TreeNode>(
 
     // Re-observe when new items mount from progressive loading
     watch(visibleCount, () => {
+        invalidateIdCache();
         if (!observer) return;
         nextTick(() => observeTree(roots));
     });

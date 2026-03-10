@@ -42,6 +42,9 @@ export interface ScrollToOptions {
     scrollOffset?: number;
     /** Max rAF retry attempts. Default: 60 */
     maxAttempts?: number;
+    /** Tree index for resolving target IDs to root section indices.
+     *  When provided, scrollTo loads only up to the target section instead of all content. */
+    treeIndex?: Map<string, TreeIndexEntry>;
 }
 
 /** Options for click delegation. */

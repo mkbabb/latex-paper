@@ -148,13 +148,23 @@ function useScrollTracker(roots, index, visibleCount, options) {
     const found = findDeepestVisible(roots);
     if (found) activeId.value = found;
   }
-  function collectIds(list, out = []) {
-    for (const node of list) {
-      out.push(node.id);
-      const children = getChildren(node);
-      if (children) collectIds(children, out);
+  let cachedIds = null;
+  function collectIds(list) {
+    if (cachedIds) return cachedIds;
+    const out = [];
+    function walk(nodes) {
+      for (const node of nodes) {
+        out.push(node.id);
+        const children = getChildren(node);
+        if (children) walk(children);
+      }
     }
+    walk(list);
+    cachedIds = out;
     return out;
+  }
+  function invalidateIdCache() {
+    cachedIds = null;
   }
   let rafId = 0;
   function onScroll() {
@@ -232,6 +242,7 @@ function useScrollTracker(roots, index, visibleCount, options) {
     scrollTarget.removeEventListener("scroll", onScroll);
   });
   watch2(visibleCount, () => {
+    invalidateIdCache();
     if (!observer) return;
     nextTick2(() => observeTree(roots));
   });
@@ -258,8 +269,23 @@ function useScrollTo(options) {
   const { scrollContainer, totalCount, visibleCount } = options;
   const scrollOffset = options.scrollOffset ?? 16;
   const maxAttempts = options.maxAttempts ?? 60;
-  function scrollTo(id) {
+  const treeIndex = options.treeIndex;
+  function ensureTargetLoaded(id) {
+    if (treeIndex) {
+      const entry = treeIndex.get(id);
+      if (entry) {
+        const needed = entry.rootIndex + 2;
+        visibleCount.value = Math.max(
+          visibleCount.value,
+          Math.min(needed, totalCount)
+        );
+        return;
+      }
+    }
     visibleCount.value = totalCount;
+  }
+  function scrollTo(id) {
+    ensureTargetLoaded(id);
     let attempts = 0;
     let lastY = -1;
     function tryScroll() {
@@ -383,7 +409,8 @@ function usePaperReader(options) {
   const { scrollTo } = useScrollTo({
     scrollContainer,
     totalCount: sections.length,
-    visibleCount
+    visibleCount,
+    treeIndex
   });
   useClickDelegate({
     container: scrollContainer,

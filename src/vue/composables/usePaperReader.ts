@@ -60,6 +60,7 @@ export function usePaperReader(options?: {
         scrollContainer,
         totalCount: sections.length,
         visibleCount,
+        treeIndex,
     });
 
     // Cross-reference click delegation

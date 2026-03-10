@@ -166,6 +166,8 @@
 
 .paper-article .paper-section {
     scroll-margin-top: 5rem;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 800px;
 }
 
 .paper-article .paper-section:not(:last-child) {

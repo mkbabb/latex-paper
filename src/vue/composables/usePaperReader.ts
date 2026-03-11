@@ -50,12 +50,11 @@ export function usePaperReader(options?: {
     );
 
     // Scroll tracking
-    const { activeId, activeRootId, forceRecalculate } = useScrollTracker(
-        treeNodes,
-        treeIndex,
-        visibleCount,
-        { sidebarEl: options?.sidebarEl, scrollContainer },
-    );
+    const { activeId, activeRootId, forceRecalculate, lockTracking, unlockTracking } =
+        useScrollTracker(treeNodes, treeIndex, visibleCount, {
+            sidebarEl: options?.sidebarEl,
+            scrollContainer,
+        });
     const { scrollTo } = useScrollTo({
         scrollContainer,
         totalCount: sections.length,
@@ -87,6 +86,8 @@ export function usePaperReader(options?: {
         activeRootId,
         scrollTo,
         forceRecalculate,
+        lockTracking,
+        unlockTracking,
         renderInline,
         renderDisplay,
         renderTitle,

@@ -4,9 +4,14 @@ export { useLazyLoader, useTreeIndex, useScrollTracker, useScrollTo, useClickDel
 export type { TreeNode, TreeIndexEntry, ScrollTrackerOptions, LazyLoaderOptions, ScrollToOptions, ClickDelegateOptions, } from "./tracking";
 export { useKatex } from "./composables/useKatex";
 export { usePaperReader } from "./composables/usePaperReader";
+export { useVirtualSectionWindow } from "./composables/useVirtualSectionWindow";
+export { flattenPaperSections } from "../paper/flattenPaperSections";
+export type { FlatPaperSection } from "../paper/flattenPaperSections";
+export type { VirtualSectionWindowOptions } from "./composables/useVirtualSectionWindow";
 export { default as MathBlock } from "./components/MathBlock.vue";
 export { default as MathInline } from "./components/MathInline.vue";
 export { default as Theorem } from "./components/Theorem.vue";
 export { default as PaperSection } from "./components/PaperSection.vue";
+export { default as PaperSectionBlocks } from "./components/PaperSectionBlocks.vue";
 export { default as PaperSectionContent } from "./components/PaperSectionContent.vue";
 //# sourceMappingURL=index.d.ts.map

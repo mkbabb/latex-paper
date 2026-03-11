@@ -1,15 +1,19 @@
-import "./chunk-BIMEYU5A.js";
+import "./chunk-ZMNCURDE.js";
 import {
   LabelRegistry,
   astToText,
+  estimatePaperSectionHeight,
+  flattenPaperSections,
   parseBibString,
   parseBibToMap,
   parseInlineString,
   parseLatex
-} from "./chunk-O3YJJZOY.js";
+} from "./chunk-H5ZLAB63.js";
 export {
   LabelRegistry,
   astToText,
+  estimatePaperSectionHeight,
+  flattenPaperSections,
   parseBibString,
   parseBibToMap,
   parseInlineString,

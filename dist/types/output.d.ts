@@ -18,15 +18,30 @@ export interface MathBlockData {
     /** Element ID for scroll-to targeting (e.g. "eq-f3"). */
     id?: string;
 }
+/** Wrapper to embed a theorem in the content stream. */
+export interface TheoremBlock {
+    theorem: PaperTheoremData;
+}
+/** Wrapper to embed a figure in the content stream. */
+export interface FigureBlock {
+    figure: PaperFigureData;
+}
 /**
- * A content block is either a paragraph (HTML string) or a display math block.
- * Use `typeof block === "string"` to distinguish.
+ * A content block in document order.
+ * - `string` → paragraph HTML
+ * - `MathBlockData` → display equation (has `.tex`)
+ * - `TheoremBlock` → theorem/definition/lemma (has `.theorem`)
+ * - `FigureBlock` → figure (has `.figure`)
  */
-export type ContentBlock = string | MathBlockData;
+export type ContentBlock = string | MathBlockData | TheoremBlock | FigureBlock;
 export interface PaperSectionData {
     id: string;
     number: string;
     title: string;
+    /** Original LaTeX sectioning level: 0=chapter, 1=section, 2=subsection, 3=subsubsection. */
+    sourceLevel?: number;
+    /** Whether the source heading used a starred LaTeX form (for example, \subsection*{...}). */
+    starred?: boolean;
     /**
      * Interleaved paragraphs and display equations in document order.
      * Strings are paragraph HTML; MathBlockData are display equations.

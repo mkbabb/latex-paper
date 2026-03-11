@@ -129,6 +129,13 @@ function useScrollTracker(roots, index, visibleCount, options) {
   const sectionVisibility = /* @__PURE__ */ new Map();
   let observer = null;
   const observedIds = /* @__PURE__ */ new Set();
+  let locked = false;
+  function lockTracking() {
+    locked = true;
+  }
+  function unlockTracking() {
+    locked = false;
+  }
   const activeRootId = computed(() => {
     if (!activeId.value) return null;
     return index.get(activeId.value)?.parentId ?? null;
@@ -168,7 +175,7 @@ function useScrollTracker(roots, index, visibleCount, options) {
   }
   let rafId = 0;
   function onScroll() {
-    if (rafId) return;
+    if (locked || rafId) return;
     rafId = requestAnimationFrame(() => {
       rafId = 0;
       const container = options?.scrollContainer?.value;
@@ -220,6 +227,7 @@ function useScrollTracker(roots, index, visibleCount, options) {
     const container = options?.scrollContainer?.value;
     observer = new IntersectionObserver(
       (entries) => {
+        if (locked) return;
         for (const entry of entries) {
           sectionVisibility.set(
             entry.target.id,
@@ -260,7 +268,41 @@ function useScrollTracker(roots, index, visibleCount, options) {
       });
     });
   }
-  return { activeId, activeRootId };
+  function forceRecalculate() {
+    sectionVisibility.clear();
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = 0;
+    const container = options?.scrollContainer?.value;
+    const topPct = parseFloat(rootMargin.split(" ")[0]) / 100;
+    const viewportH = container ? container.clientHeight : window.innerHeight;
+    const activeZoneTop = Math.abs(topPct) * viewportH;
+    const containerTop = container ? container.getBoundingClientRect().top : 0;
+    const allIds = collectIds(roots);
+    let bestId = null;
+    let bestDist = Infinity;
+    let closestBelowId = null;
+    let closestBelowDist = Infinity;
+    for (const id of allIds) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      const dist = rect.top - containerTop - activeZoneTop;
+      if (dist <= 0 && Math.abs(dist) < bestDist) {
+        bestDist = Math.abs(dist);
+        bestId = id;
+      }
+      if (dist > 0 && dist < closestBelowDist) {
+        closestBelowDist = dist;
+        closestBelowId = id;
+      }
+    }
+    const resolvedId = bestId ?? closestBelowId;
+    if (resolvedId) {
+      sectionVisibility.set(resolvedId, true);
+      activeId.value = resolvedId;
+    }
+  }
+  return { activeId, activeRootId, forceRecalculate, lockTracking, unlockTracking };
 }
 
 // src/vue/tracking/useScrollTo.ts
@@ -400,12 +442,10 @@ function usePaperReader(options) {
   const { index: treeIndex, isActive, isInActiveChain } = useTreeIndex(
     treeNodes
   );
-  const { activeId, activeRootId } = useScrollTracker(
-    treeNodes,
-    treeIndex,
-    visibleCount,
-    { sidebarEl: options?.sidebarEl, scrollContainer }
-  );
+  const { activeId, activeRootId, forceRecalculate, lockTracking, unlockTracking } = useScrollTracker(treeNodes, treeIndex, visibleCount, {
+    sidebarEl: options?.sidebarEl,
+    scrollContainer
+  });
   const { scrollTo } = useScrollTo({
     scrollContainer,
     totalCount: sections.length,
@@ -433,10 +473,395 @@ function usePaperReader(options) {
     activeId,
     activeRootId,
     scrollTo,
+    forceRecalculate,
+    lockTracking,
+    unlockTracking,
     renderInline,
     renderDisplay,
     renderTitle
   };
+}
+
+// src/vue/composables/useVirtualSectionWindow.ts
+import {
+  computed as computed2,
+  onUnmounted as onUnmounted4,
+  ref as ref3,
+  shallowRef,
+  toValue,
+  watch as watch3
+} from "vue";
+
+// src/vue/composables/virtualSectionLayout.ts
+function buildSectionLayout(items, getHeight) {
+  let offset = 0;
+  const entries = items.map((item) => {
+    const height = Math.max(1, Math.round(getHeight(item)));
+    const top = offset;
+    offset += height;
+    return {
+      item,
+      height,
+      top,
+      bottom: offset
+    };
+  });
+  return {
+    entries,
+    totalHeight: offset
+  };
+}
+function findStartIndex(entries, startOffset) {
+  if (entries.length === 0) return 0;
+  let low = 0;
+  let high = entries.length - 1;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    if (entries[mid].bottom <= startOffset) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+  return low;
+}
+function findEndIndex(entries, endOffset) {
+  if (entries.length === 0) return 0;
+  let low = 0;
+  let high = entries.length - 1;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (entries[mid].top < endOffset) {
+      low = mid;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return low;
+}
+function resolveSectionWindow(layout, scrollTopPx, viewportHeightPx, overscanBeforePx, overscanAfterPx, forcedRange) {
+  if (layout.entries.length === 0) {
+    return {
+      startIndex: 0,
+      endIndex: -1,
+      topSpacerPx: 0,
+      bottomSpacerPx: 0
+    };
+  }
+  const startOffset = Math.max(0, scrollTopPx - overscanBeforePx);
+  const endOffset = Math.max(
+    0,
+    scrollTopPx + viewportHeightPx + overscanAfterPx
+  );
+  let startIndex = findStartIndex(layout.entries, startOffset);
+  let endIndex = findEndIndex(layout.entries, endOffset);
+  if (forcedRange) {
+    startIndex = Math.min(startIndex, forcedRange.startIndex);
+    endIndex = Math.max(endIndex, forcedRange.endIndex);
+  }
+  startIndex = Math.max(0, Math.min(startIndex, layout.entries.length - 1));
+  endIndex = Math.max(startIndex, Math.min(endIndex, layout.entries.length - 1));
+  return {
+    startIndex,
+    endIndex,
+    topSpacerPx: layout.entries[startIndex]?.top ?? 0,
+    bottomSpacerPx: Math.max(
+      0,
+      layout.totalHeight - (layout.entries[endIndex]?.bottom ?? 0)
+    )
+  };
+}
+function resolveActiveSection(layout, activeOffsetPx) {
+  if (layout.entries.length === 0) return null;
+  let low = 0;
+  let high = layout.entries.length - 1;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (layout.entries[mid].top <= activeOffsetPx) {
+      low = mid;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return layout.entries[low]?.item ?? null;
+}
+function findSectionOffset(layout, id) {
+  for (const entry of layout.entries) {
+    if (entry.item.id === id) {
+      return entry.top;
+    }
+  }
+  return null;
+}
+
+// src/vue/composables/useVirtualSectionWindow.ts
+var SESSION_HEIGHT_CACHE = /* @__PURE__ */ new Map();
+function useVirtualSectionWindow(options) {
+  const items = computed2(() => Array.from(toValue(options.items)));
+  const measuredHeights = /* @__PURE__ */ new Map();
+  const itemIndex = /* @__PURE__ */ new Map();
+  const layout = shallowRef({
+    entries: [],
+    totalHeight: 0
+  });
+  const range = ref3({
+    startIndex: 0,
+    endIndex: -1,
+    topSpacerPx: 0,
+    bottomSpacerPx: 0
+  });
+  const activeItem = ref3(null);
+  const warmRange = ref3(null);
+  const elementMap = /* @__PURE__ */ new Map();
+  let scrollRaf = 0;
+  let recalcRaf = 0;
+  let warmTimer = 0;
+  let containerResizeObserver = null;
+  function getViewportHeight() {
+    return Math.max(
+      1,
+      options.scrollContainer.value?.clientHeight ?? window.innerHeight ?? 900
+    );
+  }
+  function getLeadingOffset() {
+    return Math.max(0, toValue(options.leadingOffsetPx) ?? 0);
+  }
+  function getHeight(item) {
+    return measuredHeights.get(item.id) ?? SESSION_HEIGHT_CACHE.get(item.id) ?? item.estimatedHeight;
+  }
+  function rebuildLayout() {
+    layout.value = buildSectionLayout(items.value, getHeight);
+  }
+  function computeWindowState() {
+    const container = options.scrollContainer.value;
+    const viewportHeight = getViewportHeight();
+    const overscanBeforePx = options.overscanBeforePx ?? viewportHeight;
+    const overscanAfterPx = options.overscanAfterPx ?? viewportHeight * 2;
+    const normalizedScrollTop = Math.max(
+      0,
+      (container?.scrollTop ?? 0) - getLeadingOffset()
+    );
+    range.value = resolveSectionWindow(
+      layout.value,
+      normalizedScrollTop,
+      viewportHeight,
+      overscanBeforePx,
+      overscanAfterPx,
+      warmRange.value
+    );
+    activeItem.value = resolveActiveSection(
+      layout.value,
+      normalizedScrollTop + viewportHeight * 0.2
+    );
+  }
+  function recalculate() {
+    rebuildLayout();
+    computeWindowState();
+  }
+  function scheduleRecalculate() {
+    if (recalcRaf) return;
+    recalcRaf = requestAnimationFrame(() => {
+      recalcRaf = 0;
+      recalculate();
+    });
+  }
+  function scheduleWarmRangeRelease() {
+    if (warmTimer) window.clearTimeout(warmTimer);
+    warmTimer = window.setTimeout(() => {
+      warmRange.value = null;
+      scheduleRecalculate();
+    }, 320);
+  }
+  function syncMeasuredHeight(id, height) {
+    const normalized = Math.max(1, Math.round(height));
+    if (measuredHeights.get(id) === normalized) return;
+    measuredHeights.set(id, normalized);
+    SESSION_HEIGHT_CACHE.set(id, normalized);
+    scheduleWarmRangeRelease();
+    scheduleRecalculate();
+  }
+  function disconnectSection(id) {
+    elementMap.delete(id);
+  }
+  function measureSection(id, el) {
+    if (!el) {
+      disconnectSection(id);
+      return;
+    }
+    const current = elementMap.get(id);
+    if (current === el) {
+      syncMeasuredHeight(id, el.offsetHeight);
+      return;
+    }
+    disconnectSection(id);
+    elementMap.set(id, el);
+    requestAnimationFrame(() => {
+      const target = elementMap.get(id);
+      if (target) syncMeasuredHeight(id, target.offsetHeight);
+    });
+  }
+  function ensureTargetWindow(id) {
+    const index = itemIndex.get(id);
+    if (index == null) return;
+    const warmBefore = options.warmTargetBefore ?? 2;
+    const warmAfter = options.warmTargetAfter ?? 3;
+    warmRange.value = {
+      startIndex: Math.max(0, index - warmBefore),
+      endIndex: Math.min(items.value.length - 1, index + warmAfter)
+    };
+    scheduleWarmRangeRelease();
+    recalculate();
+  }
+  function getOffsetFor(id) {
+    return findSectionOffset(layout.value, id);
+  }
+  function attachContainerObserver(container) {
+    containerResizeObserver?.disconnect();
+    containerResizeObserver = null;
+    if (!container || typeof ResizeObserver === "undefined") return;
+    containerResizeObserver = new ResizeObserver(() => {
+      scheduleRecalculate();
+    });
+    containerResizeObserver.observe(container);
+  }
+  function handleScroll() {
+    if (scrollRaf) return;
+    scrollRaf = requestAnimationFrame(() => {
+      scrollRaf = 0;
+      computeWindowState();
+    });
+  }
+  let currentContainer = null;
+  function bindContainer(container) {
+    if (currentContainer === container) return;
+    currentContainer?.removeEventListener("scroll", handleScroll);
+    currentContainer = container;
+    currentContainer?.addEventListener("scroll", handleScroll, { passive: true });
+    attachContainerObserver(container);
+    scheduleRecalculate();
+  }
+  watch3(
+    items,
+    (nextItems) => {
+      itemIndex.clear();
+      for (const item of nextItems) {
+        itemIndex.set(item.id, item.index);
+        const cached = SESSION_HEIGHT_CACHE.get(item.id);
+        if (cached != null) measuredHeights.set(item.id, cached);
+      }
+      for (const id of [...measuredHeights.keys()]) {
+        if (!itemIndex.has(id)) measuredHeights.delete(id);
+      }
+      recalculate();
+    },
+    { immediate: true }
+  );
+  watch3(
+    options.scrollContainer,
+    (container) => bindContainer(container),
+    { immediate: true }
+  );
+  watch3(
+    () => toValue(options.leadingOffsetPx),
+    () => scheduleRecalculate()
+  );
+  onUnmounted4(() => {
+    if (scrollRaf) cancelAnimationFrame(scrollRaf);
+    if (recalcRaf) cancelAnimationFrame(recalcRaf);
+    if (warmTimer) window.clearTimeout(warmTimer);
+    currentContainer?.removeEventListener("scroll", handleScroll);
+    containerResizeObserver?.disconnect();
+    elementMap.clear();
+  });
+  const visibleItems = computed2(() => {
+    if (range.value.endIndex < range.value.startIndex) return [];
+    return items.value.slice(range.value.startIndex, range.value.endIndex + 1);
+  });
+  const activeId = computed2(() => activeItem.value?.id ?? null);
+  const activeRootId = computed2(() => activeItem.value?.rootId ?? null);
+  return {
+    visibleItems,
+    topSpacerPx: computed2(() => range.value.topSpacerPx),
+    bottomSpacerPx: computed2(() => range.value.bottomSpacerPx),
+    measureSection,
+    ensureTargetWindow,
+    getOffsetFor,
+    activeId,
+    activeRootId,
+    recalculate
+  };
+}
+
+// src/paper/flattenPaperSections.ts
+function stripMarkup(text) {
+  return text.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/gi, " ").replace(/\$[^$]*\$/g, " ").replace(/\s+/g, " ").trim();
+}
+function estimateTextHeight(text) {
+  const clean = stripMarkup(text);
+  if (!clean) return 40;
+  const lines = Math.ceil(clean.length / 180);
+  return 40 + lines * 26;
+}
+function estimateBlockHeight(block) {
+  if (typeof block === "string") {
+    return estimateTextHeight(block);
+  }
+  if ("figure" in block) {
+    const figure = block.figure;
+    return 300 + estimateTextHeight(figure.caption);
+  }
+  if ("theorem" in block) {
+    const theorem = block.theorem;
+    const mathCount = theorem.math?.length ?? 0;
+    return 140 + estimateTextHeight(theorem.body) + mathCount * 96;
+  }
+  const math = block;
+  return 104 + Math.min(120, Math.ceil(math.tex.length / 120) * 16);
+}
+function estimatePaperSectionHeight(section, depth) {
+  const headingHeight = depth === 0 ? 124 : depth === 1 ? 88 : 72;
+  const depthPadding = Math.max(0, 24 - depth * 4);
+  const contentHeight = section.content.reduce(
+    (sum, block) => sum + estimateBlockHeight(block),
+    0
+  );
+  const calloutHeight = section.callout ? 148 : 0;
+  return Math.max(
+    depth === 0 ? 320 : 220,
+    Math.round(headingHeight + depthPadding + contentHeight + calloutHeight)
+  );
+}
+function flattenPaperSections(sections) {
+  const flat = [];
+  function walk(nodes, depth, parentId, rootId, rootIndex) {
+    for (const [nodeIndex, section] of nodes.entries()) {
+      const nextRootId = depth === 0 ? section.id : rootId;
+      const nextRootIndex = depth === 0 ? nodeIndex : rootIndex;
+      flat.push({
+        id: section.id,
+        index: flat.length,
+        depth,
+        sourceLevel: section.sourceLevel ?? depth,
+        starred: section.starred ?? false,
+        parentId,
+        rootId: nextRootId,
+        rootIndex: nextRootIndex,
+        section,
+        estimatedHeight: estimatePaperSectionHeight(section, depth)
+      });
+      if (section.subsections?.length) {
+        walk(
+          section.subsections,
+          depth + 1,
+          section.id,
+          nextRootId,
+          nextRootIndex
+        );
+      }
+    }
+  }
+  walk(sections, 0, null, "", 0);
+  return flat;
 }
 
 // sfc-script:/Users/mkbabb/Programming/latex-paper/src/vue/components/MathBlock.vue?type=script
@@ -684,16 +1109,18 @@ PaperSection_default.render = render4;
 PaperSection_default.__file = "src/vue/components/PaperSection.vue";
 var PaperSection_default2 = PaperSection_default;
 
-// sfc-script:/Users/mkbabb/Programming/latex-paper/src/vue/components/PaperSectionContent.vue?type=script
+// sfc-script:/Users/mkbabb/Programming/latex-paper/src/vue/components/PaperSectionBlocks.vue?type=script
 import { defineComponent as _defineComponent5 } from "vue";
 import { inject as inject7, provide, useSlots } from "vue";
+
+// src/vue/components/paperSectionSlots.ts
 var CONTENT_SLOTS = /* @__PURE__ */ Symbol("content-slots");
-var PaperSectionContent_default = /* @__PURE__ */ _defineComponent5({
-  __name: "PaperSectionContent",
+
+// sfc-script:/Users/mkbabb/Programming/latex-paper/src/vue/components/PaperSectionBlocks.vue?type=script
+var PaperSectionBlocks_default = /* @__PURE__ */ _defineComponent5({
+  __name: "PaperSectionBlocks",
   props: {
-    section: { type: Object, required: true },
-    depth: { type: Number, required: true },
-    sectionIndex: { type: Number, required: true }
+    section: { type: Object, required: true }
   },
   setup(__props, { expose: __expose }) {
     __expose();
@@ -709,19 +1136,19 @@ var PaperSectionContent_default = /* @__PURE__ */ _defineComponent5({
     function isBlockHtml(text) {
       return /^<(ol|ul|dl|blockquote|div)\b/.test(text.trim());
     }
-    const __returned__ = { CONTENT_SLOTS, props, ownSlots, parentSlots, effectiveSlots, ctx, renderParagraph, isBlockHtml, MathBlock: MathBlock_default2, PaperSection: PaperSection_default2, Theorem: Theorem_default2 };
+    const __returned__ = { props, ownSlots, parentSlots, effectiveSlots, ctx, renderParagraph, isBlockHtml, MathBlock: MathBlock_default2, Theorem: Theorem_default2 };
     Object.defineProperty(__returned__, "__isScriptSetup", { enumerable: false, value: true });
     return __returned__;
   }
 });
 
-// sfc-template:/Users/mkbabb/Programming/latex-paper/src/vue/components/PaperSectionContent.vue?type=template
-import { createCommentVNode as _createCommentVNode3, renderList as _renderList, Fragment as _Fragment2, openBlock as _openBlock3, createElementBlock as _createElementBlock3, createBlock as _createBlock2, resolveDynamicComponent as _resolveDynamicComponent2, withCtx as _withCtx2, resolveComponent as _resolveComponent, toDisplayString as _toDisplayString3, createElementVNode as _createElementVNode5 } from "vue";
+// sfc-template:/Users/mkbabb/Programming/latex-paper/src/vue/components/PaperSectionBlocks.vue?type=template
+import { renderList as _renderList, Fragment as _Fragment2, openBlock as _openBlock3, createElementBlock as _createElementBlock3, createCommentVNode as _createCommentVNode3, createBlock as _createBlock2, withCtx as _withCtx2, resolveDynamicComponent as _resolveDynamicComponent2, toDisplayString as _toDisplayString3, createElementVNode as _createElementVNode5 } from "vue";
 var _hoisted_13 = ["innerHTML"];
 var _hoisted_23 = ["innerHTML"];
-var _hoisted_33 = ["id"];
-var _hoisted_43 = ["src", "alt"];
-var _hoisted_53 = ["innerHTML"];
+var _hoisted_33 = ["innerHTML"];
+var _hoisted_43 = ["id"];
+var _hoisted_53 = ["src", "alt"];
 var _hoisted_6 = ["innerHTML"];
 var _hoisted_7 = {
   key: 1,
@@ -729,16 +1156,10 @@ var _hoisted_7 = {
 };
 var _hoisted_8 = ["href"];
 function render5(_ctx, _cache, $props, $setup, $data, $options) {
-  const _component_PaperSectionContent = _resolveComponent("PaperSectionContent", true);
-  return _openBlock3(), _createBlock2($setup["PaperSection"], {
-    id: $props.section.id,
-    number: $props.section.number,
-    title: $props.section.title,
-    depth: $props.depth,
-    "section-index": $props.sectionIndex
-  }, {
-    default: _withCtx2(() => [
-      _createCommentVNode3(" Interleaved paragraphs and display math "),
+  return _openBlock3(), _createElementBlock3(
+    _Fragment2,
+    null,
+    [
       (_openBlock3(true), _createElementBlock3(
         _Fragment2,
         null,
@@ -761,8 +1182,49 @@ function render5(_ctx, _cache, $props, $setup, $data, $options) {
                 ],
                 64
                 /* STABLE_FRAGMENT */
-              )) : (_openBlock3(), _createBlock2($setup["MathBlock"], {
+              )) : "theorem" in block ? (_openBlock3(), _createBlock2($setup["Theorem"], {
                 key: 1,
+                type: block.theorem.type,
+                name: block.theorem.name,
+                number: block.theorem.number,
+                label: block.theorem.label
+              }, {
+                default: _withCtx2(() => [
+                  block.theorem.body.trim() ? (_openBlock3(), _createElementBlock3("p", {
+                    key: 0,
+                    innerHTML: $setup.renderParagraph(block.theorem.body)
+                  }, null, 8, _hoisted_33)) : _createCommentVNode3("v-if", true),
+                  (_openBlock3(true), _createElementBlock3(
+                    _Fragment2,
+                    null,
+                    _renderList(block.theorem.math, (eq, ei) => {
+                      return _openBlock3(), _createBlock2($setup["MathBlock"], {
+                        key: ei,
+                        tex: eq
+                      }, null, 8, ["tex"]);
+                    }),
+                    128
+                    /* KEYED_FRAGMENT */
+                  ))
+                ]),
+                _: 2
+                /* DYNAMIC */
+              }, 1032, ["type", "name", "number", "label"])) : "figure" in block ? (_openBlock3(), _createElementBlock3("figure", {
+                key: 2,
+                id: block.figure.label ? block.figure.label.replace(/:/g, "-") : void 0
+              }, [
+                $setup.effectiveSlots.figure ? (_openBlock3(), _createBlock2(_resolveDynamicComponent2(() => $setup.effectiveSlots.figure({ figure: block.figure, index: bi })), { key: 0 })) : (_openBlock3(), _createElementBlock3("img", {
+                  key: 1,
+                  src: `${$setup.ctx.assetBase}${block.figure.filename}`,
+                  alt: block.figure.caption,
+                  loading: "lazy"
+                }, null, 8, _hoisted_53)),
+                block.figure.caption ? (_openBlock3(), _createElementBlock3("figcaption", {
+                  key: 2,
+                  innerHTML: $setup.renderParagraph(block.figure.caption)
+                }, null, 8, _hoisted_6)) : _createCommentVNode3("v-if", true)
+              ], 8, _hoisted_43)) : (_openBlock3(), _createBlock2($setup["MathBlock"], {
+                key: 3,
                 tex: block.tex,
                 id: block.id
               }, null, 8, ["tex", "id"]))
@@ -774,86 +1236,9 @@ function render5(_ctx, _cache, $props, $setup, $data, $options) {
         128
         /* KEYED_FRAGMENT */
       )),
-      _createCommentVNode3(" Figures "),
-      $props.section.figures ? (_openBlock3(true), _createElementBlock3(
-        _Fragment2,
-        { key: 0 },
-        _renderList($props.section.figures, (fig, fi) => {
-          return _openBlock3(), _createElementBlock3("figure", {
-            key: fi,
-            id: fig.label ? fig.label.replace(/:/g, "-") : void 0
-          }, [
-            $setup.effectiveSlots.figure ? (_openBlock3(), _createBlock2(_resolveDynamicComponent2(() => $setup.effectiveSlots.figure({ figure: fig, index: fi })), { key: 0 })) : (_openBlock3(), _createElementBlock3("img", {
-              key: 1,
-              src: `${$setup.ctx.assetBase}${fig.filename}`,
-              alt: fig.caption,
-              loading: "lazy"
-            }, null, 8, _hoisted_43)),
-            fig.caption ? (_openBlock3(), _createElementBlock3("figcaption", {
-              key: 2,
-              innerHTML: $setup.renderParagraph(fig.caption)
-            }, null, 8, _hoisted_53)) : _createCommentVNode3("v-if", true)
-          ], 8, _hoisted_33);
-        }),
-        128
-        /* KEYED_FRAGMENT */
-      )) : _createCommentVNode3("v-if", true),
-      _createCommentVNode3(" Theorems "),
-      $props.section.theorems ? (_openBlock3(true), _createElementBlock3(
-        _Fragment2,
-        { key: 1 },
-        _renderList($props.section.theorems, (thm, ti) => {
-          return _openBlock3(), _createBlock2($setup["Theorem"], {
-            key: ti,
-            type: thm.type,
-            name: thm.name,
-            number: thm.number,
-            label: thm.label
-          }, {
-            default: _withCtx2(() => [
-              thm.body.trim() ? (_openBlock3(), _createElementBlock3("p", {
-                key: 0,
-                innerHTML: $setup.renderParagraph(thm.body)
-              }, null, 8, _hoisted_6)) : _createCommentVNode3("v-if", true),
-              (_openBlock3(true), _createElementBlock3(
-                _Fragment2,
-                null,
-                _renderList(thm.math, (eq, ei) => {
-                  return _openBlock3(), _createBlock2($setup["MathBlock"], {
-                    key: ei,
-                    tex: eq
-                  }, null, 8, ["tex"]);
-                }),
-                128
-                /* KEYED_FRAGMENT */
-              ))
-            ]),
-            _: 2
-            /* DYNAMIC */
-          }, 1032, ["type", "name", "number", "label"]);
-        }),
-        128
-        /* KEYED_FRAGMENT */
-      )) : _createCommentVNode3("v-if", true),
-      _createCommentVNode3(" Recursive subsections "),
-      $props.section.subsections ? (_openBlock3(true), _createElementBlock3(
-        _Fragment2,
-        { key: 2 },
-        _renderList($props.section.subsections, (sub) => {
-          return _openBlock3(), _createBlock2(_component_PaperSectionContent, {
-            key: sub.id,
-            section: sub,
-            depth: $props.depth + 1,
-            "section-index": $props.sectionIndex
-          }, null, 8, ["section", "depth", "section-index"]);
-        }),
-        128
-        /* KEYED_FRAGMENT */
-      )) : _createCommentVNode3("v-if", true),
-      _createCommentVNode3(" Callout "),
       $props.section.callout ? (_openBlock3(), _createElementBlock3(
         _Fragment2,
-        { key: 3 },
+        { key: 0 },
         [
           $setup.effectiveSlots.callout ? (_openBlock3(), _createBlock2(_resolveDynamicComponent2(() => $setup.effectiveSlots.callout({ callout: $props.section.callout, section: $props.section })), { key: 0 })) : (_openBlock3(), _createElementBlock3("div", _hoisted_7, [
             _createElementVNode5("a", {
@@ -864,6 +1249,68 @@ function render5(_ctx, _cache, $props, $setup, $data, $options) {
         64
         /* STABLE_FRAGMENT */
       )) : _createCommentVNode3("v-if", true)
+    ],
+    64
+    /* STABLE_FRAGMENT */
+  );
+}
+
+// src/vue/components/PaperSectionBlocks.vue
+PaperSectionBlocks_default.render = render5;
+PaperSectionBlocks_default.__file = "src/vue/components/PaperSectionBlocks.vue";
+var PaperSectionBlocks_default2 = PaperSectionBlocks_default;
+
+// sfc-script:/Users/mkbabb/Programming/latex-paper/src/vue/components/PaperSectionContent.vue?type=script
+import { defineComponent as _defineComponent6 } from "vue";
+import { inject as inject8, provide as provide2, useSlots as useSlots2 } from "vue";
+var PaperSectionContent_default = /* @__PURE__ */ _defineComponent6({
+  __name: "PaperSectionContent",
+  props: {
+    section: { type: Object, required: true },
+    depth: { type: Number, required: true },
+    sectionIndex: { type: Number, required: true }
+  },
+  setup(__props, { expose: __expose }) {
+    __expose();
+    const props = __props;
+    const ownSlots = useSlots2();
+    const parentSlots = inject8(CONTENT_SLOTS, null);
+    const effectiveSlots = parentSlots ?? ownSlots;
+    provide2(CONTENT_SLOTS, effectiveSlots);
+    const __returned__ = { props, ownSlots, parentSlots, effectiveSlots, PaperSectionBlocks: PaperSectionBlocks_default2, PaperSection: PaperSection_default2 };
+    Object.defineProperty(__returned__, "__isScriptSetup", { enumerable: false, value: true });
+    return __returned__;
+  }
+});
+
+// sfc-template:/Users/mkbabb/Programming/latex-paper/src/vue/components/PaperSectionContent.vue?type=template
+import { createVNode as _createVNode, createCommentVNode as _createCommentVNode4, renderList as _renderList2, Fragment as _Fragment3, openBlock as _openBlock4, createElementBlock as _createElementBlock4, resolveComponent as _resolveComponent, createBlock as _createBlock3, withCtx as _withCtx3 } from "vue";
+function render6(_ctx, _cache, $props, $setup, $data, $options) {
+  const _component_PaperSectionContent = _resolveComponent("PaperSectionContent", true);
+  return _openBlock4(), _createBlock3($setup["PaperSection"], {
+    id: $props.section.id,
+    number: $props.section.number,
+    title: $props.section.title,
+    depth: $props.depth,
+    "section-index": $props.sectionIndex
+  }, {
+    default: _withCtx3(() => [
+      _createVNode($setup["PaperSectionBlocks"], { section: $props.section }, null, 8, ["section"]),
+      _createCommentVNode4(" Recursive subsections "),
+      $props.section.subsections ? (_openBlock4(true), _createElementBlock4(
+        _Fragment3,
+        { key: 0 },
+        _renderList2($props.section.subsections, (sub) => {
+          return _openBlock4(), _createBlock3(_component_PaperSectionContent, {
+            key: sub.id,
+            section: sub,
+            depth: $props.depth + 1,
+            "section-index": $props.sectionIndex
+          }, null, 8, ["section", "depth", "section-index"]);
+        }),
+        128
+        /* KEYED_FRAGMENT */
+      )) : _createCommentVNode4("v-if", true)
     ]),
     _: 1
     /* STABLE */
@@ -871,7 +1318,7 @@ function render5(_ctx, _cache, $props, $setup, $data, $options) {
 }
 
 // src/vue/components/PaperSectionContent.vue
-PaperSectionContent_default.render = render5;
+PaperSectionContent_default.render = render6;
 PaperSectionContent_default.__file = "src/vue/components/PaperSectionContent.vue";
 var PaperSectionContent_default2 = PaperSectionContent_default;
 export {
@@ -879,15 +1326,18 @@ export {
   MathInline_default2 as MathInline,
   PAPER_CONTEXT,
   PaperSection_default2 as PaperSection,
+  PaperSectionBlocks_default2 as PaperSectionBlocks,
   PaperSectionContent_default2 as PaperSectionContent,
   Theorem_default2 as Theorem,
   createRenderTitle,
+  flattenPaperSections,
   useClickDelegate,
   useKatex,
   useLazyLoader,
   usePaperReader,
   useScrollTo,
   useScrollTracker,
-  useTreeIndex
+  useTreeIndex,
+  useVirtualSectionWindow
 };
 //# sourceMappingURL=vue.js.map

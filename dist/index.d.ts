@@ -1,4 +1,4 @@
-export { C as ContentBlock, M as MathBlockData, P as PaperFigureData, c as PaperLabelInfo, a as PaperSectionData, b as PaperTheoremData } from './output-zFciSIqc.js';
+export { C as ContentBlock, F as FigureBlock, d as FlatPaperSection, M as MathBlockData, P as PaperFigureData, c as PaperLabelInfo, a as PaperSectionData, b as PaperTheoremData, T as TheoremBlock, e as estimatePaperSectionHeight, f as flattenPaperSections } from './flattenPaperSections-jzNipltq.js';
 
 /** Discriminated union of all LaTeX AST node types. */
 interface TextNode {

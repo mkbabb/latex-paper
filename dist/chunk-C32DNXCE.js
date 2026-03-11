@@ -3,7 +3,7 @@ import {
   LabelRegistry,
   SYMBOL_MAP,
   astToText
-} from "./chunk-O3YJJZOY.js";
+} from "./chunk-H5ZLAB63.js";
 
 // src/transform/clean.ts
 function replaceAccents(text) {
@@ -195,6 +195,7 @@ var Transformer = class {
             astToText(node.title),
             (key) => this.labels.resolve(key)?.number
           ),
+          starred: node.starred,
           startIdx: i + 1,
           endIdx: nodes.length
         });
@@ -214,8 +215,8 @@ var Transformer = class {
       const bodyNodes = nodes.slice(range.startIdx, range.endIdx);
       const id = slugify(range.title);
       const content = this.extractContent(bodyNodes);
-      const theorems = this.extractTheorems(bodyNodes);
-      const figures = this.extractFigures(bodyNodes);
+      const theorems = content.filter((b) => typeof b === "object" && b !== null && "theorem" in b).map((b) => b.theorem);
+      const figures = content.filter((b) => typeof b === "object" && b !== null && "figure" in b).map((b) => b.figure);
       const callout = callouts[id];
       this.tagLabelsInNodes(bodyNodes, id);
       if (range.level === 0) {
@@ -226,6 +227,8 @@ var Transformer = class {
           id,
           number: String(chapterNum),
           title: range.title,
+          sourceLevel: range.level,
+          starred: range.starred,
           content,
           ...theorems.length > 0 && { theorems },
           ...figures.length > 0 && { figures },
@@ -242,6 +245,8 @@ var Transformer = class {
             id,
             number: String(chapterNum),
             title: range.title,
+            sourceLevel: range.level,
+            starred: range.starred,
             content,
             ...theorems.length > 0 && { theorems },
             ...figures.length > 0 && { figures },
@@ -254,6 +259,8 @@ var Transformer = class {
             id,
             number: `${chapterNum}.${sectionNum}`,
             title: range.title,
+            sourceLevel: range.level,
+            starred: range.starred,
             content,
             ...theorems.length > 0 && { theorems },
             ...figures.length > 0 && { figures },
@@ -270,6 +277,8 @@ var Transformer = class {
             id,
             number: `${chapterNum}.${sectionNum}`,
             title: range.title,
+            sourceLevel: range.level,
+            starred: range.starred,
             content,
             ...theorems.length > 0 && { theorems },
             ...figures.length > 0 && { figures },
@@ -286,6 +295,8 @@ var Transformer = class {
               id,
               number: `${chapterNum}.${sectionNum}.${subsectionNum}`,
               title: range.title,
+              sourceLevel: range.level,
+              starred: range.starred,
               content,
               ...theorems.length > 0 && { theorems },
               ...figures.length > 0 && { figures },
@@ -367,8 +378,8 @@ var Transformer = class {
     }
   }
   /**
-   * Extract interleaved paragraphs and display math from body nodes.
-   * Returns ContentBlock[]: strings are paragraph HTML, MathBlockData are equations.
+   * Extract all content blocks in document order: paragraphs, display math,
+   * theorems, and figures interleaved as they appear in the source.
    */
   extractContent(nodes) {
     const content = [];
@@ -381,7 +392,23 @@ var Transformer = class {
       current = [];
     };
     for (const node of nodes) {
-      if (node.type === "theorem" || node.type === "figure" || node.type === "proof" || node.type === "section") {
+      if (node.type === "section" || node.type === "proof") {
+        continue;
+      }
+      if (node.type === "theorem") {
+        flush();
+        const thm = this.transformTheorem(node);
+        if (thm) content.push({ theorem: thm });
+        continue;
+      }
+      if (node.type === "figure" && node.filename) {
+        flush();
+        const fig = {
+          filename: node.filename,
+          caption: node.caption ? this.nodesToHtml(node.caption) : "",
+          ...node.label && { label: node.label }
+        };
+        content.push({ figure: fig });
         continue;
       }
       if (node.type === "math" && node.display) {
@@ -403,31 +430,6 @@ var Transformer = class {
     }
     flush();
     return content;
-  }
-  /** Extract theorems from body nodes. */
-  extractTheorems(nodes) {
-    const theorems = [];
-    for (const node of nodes) {
-      if (node.type === "theorem") {
-        const thm = this.transformTheorem(node);
-        if (thm) theorems.push(thm);
-      }
-    }
-    return theorems;
-  }
-  /** Extract figures from body nodes. */
-  extractFigures(nodes) {
-    const figures = [];
-    for (const node of nodes) {
-      if (node.type === "figure" && node.filename) {
-        figures.push({
-          filename: node.filename,
-          caption: node.caption ? this.nodesToHtml(node.caption) : "",
-          ...node.label && { label: node.label }
-        });
-      }
-    }
-    return figures;
   }
   transformTheorem(node) {
     const validTypes = /* @__PURE__ */ new Set([
@@ -612,4 +614,4 @@ export {
   Transformer,
   transformDocument
 };
-//# sourceMappingURL=chunk-4LCLO5SZ.js.map
+//# sourceMappingURL=chunk-C32DNXCE.js.map

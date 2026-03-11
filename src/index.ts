@@ -32,6 +32,8 @@ export type {
     PaperLabelInfo,
     MathBlockData,
     ContentBlock,
+    TheoremBlock,
+    FigureBlock,
 } from "./types/output";
 
 // BibTeX types
@@ -44,3 +46,10 @@ export { parseBibString, parseBibToMap } from "./bibtex/parser";
 // Labels
 export { LabelRegistry } from "./transform/labels";
 export type { LabelInfo } from "./transform/labels";
+
+// Paper helpers
+export {
+    flattenPaperSections,
+    estimatePaperSectionHeight,
+} from "./paper/flattenPaperSections";
+export type { FlatPaperSection } from "./paper/flattenPaperSections";

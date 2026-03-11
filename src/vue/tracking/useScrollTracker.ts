@@ -28,6 +28,14 @@ export function useScrollTracker<T extends TreeNode>(
     const sectionVisibility = new Map<string, boolean>();
     let observer: IntersectionObserver | null = null;
     const observedIds = new Set<string>();
+    let locked = false;
+
+    function lockTracking() {
+        locked = true;
+    }
+    function unlockTracking() {
+        locked = false;
+    }
 
     const activeRootId = computed(() => {
         if (!activeId.value) return null;
@@ -80,7 +88,7 @@ export function useScrollTracker<T extends TreeNode>(
      */
     let rafId = 0;
     function onScroll() {
-        if (rafId) return;
+        if (locked || rafId) return;
         rafId = requestAnimationFrame(() => {
             rafId = 0;
             const container = options?.scrollContainer?.value;
@@ -147,6 +155,7 @@ export function useScrollTracker<T extends TreeNode>(
         const container = options?.scrollContainer?.value;
         observer = new IntersectionObserver(
             (entries) => {
+                if (locked) return;
                 for (const entry of entries) {
                     sectionVisibility.set(
                         (entry.target as HTMLElement).id,
@@ -195,14 +204,54 @@ export function useScrollTracker<T extends TreeNode>(
         });
     }
 
-    /** Clear stale visibility state and force position recalculation. */
+    /**
+     * Clear stale visibility state and force position recalculation.
+     * Runs the position-finding logic **synchronously** so that activeId
+     * updates immediately (no rAF deferral).
+     */
     function forceRecalculate() {
         sectionVisibility.clear();
-        // Run scroll fallback synchronously to immediately pick up correct section
         if (rafId) cancelAnimationFrame(rafId);
         rafId = 0;
-        onScroll();
+
+        // Inline the same logic as onScroll, but synchronously
+        const container = options?.scrollContainer?.value;
+        const topPct = parseFloat(rootMargin.split(" ")[0]) / 100;
+        const viewportH = container
+            ? container.clientHeight
+            : window.innerHeight;
+        const activeZoneTop = Math.abs(topPct) * viewportH;
+        const containerTop = container
+            ? container.getBoundingClientRect().top
+            : 0;
+
+        const allIds = collectIds(roots);
+        let bestId: string | null = null;
+        let bestDist = Infinity;
+        let closestBelowId: string | null = null;
+        let closestBelowDist = Infinity;
+
+        for (const id of allIds) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            const rect = el.getBoundingClientRect();
+            const dist = rect.top - containerTop - activeZoneTop;
+            if (dist <= 0 && Math.abs(dist) < bestDist) {
+                bestDist = Math.abs(dist);
+                bestId = id;
+            }
+            if (dist > 0 && dist < closestBelowDist) {
+                closestBelowDist = dist;
+                closestBelowId = id;
+            }
+        }
+
+        const resolvedId = bestId ?? closestBelowId;
+        if (resolvedId) {
+            sectionVisibility.set(resolvedId, true);
+            activeId.value = resolvedId;
+        }
     }
 
-    return { activeId, activeRootId, forceRecalculate };
+    return { activeId, activeRootId, forceRecalculate, lockTracking, unlockTracking };
 }

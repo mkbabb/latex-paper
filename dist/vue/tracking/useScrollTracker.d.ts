@@ -14,5 +14,8 @@ export declare function useScrollTracker<T extends TreeNode>(roots: T[], index: 
 }): {
     activeId: Ref<string | null, string | null>;
     activeRootId: import("vue").ComputedRef<string | null>;
+    forceRecalculate: () => void;
+    lockTracking: () => void;
+    unlockTracking: () => void;
 };
 //# sourceMappingURL=useScrollTracker.d.ts.map

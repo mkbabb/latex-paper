@@ -1,7 +1,7 @@
 import { BibEntry, LatexNode } from './index.js';
 export { CommandNode, CommentNode, DescriptionNode, EnvironmentNode, FigureNode, GroupNode, LabelInfo, LabelNode, LabelRegistry, ListNode, MathNode, ParagraphBreakNode, ProofNode, QuoteNode, SectionNode, TextNode, TheoremNode, astToText, parseBibString, parseBibToMap, parseInlineString, parseLatex } from './index.js';
-import { a as PaperSectionData, c as PaperLabelInfo } from './output-zFciSIqc.js';
-export { C as ContentBlock, M as MathBlockData, P as PaperFigureData, b as PaperTheoremData } from './output-zFciSIqc.js';
+import { a as PaperSectionData, c as PaperLabelInfo } from './flattenPaperSections-jzNipltq.js';
+export { C as ContentBlock, F as FigureBlock, d as FlatPaperSection, M as MathBlockData, P as PaperFigureData, b as PaperTheoremData, T as TheoremBlock, e as estimatePaperSectionHeight, f as flattenPaperSections } from './flattenPaperSections-jzNipltq.js';
 
 /**
  * Raw LaTeX text cleanup utilities.
@@ -76,14 +76,10 @@ declare class Transformer {
     private generateSummaries;
     private cleanEmpty;
     /**
-     * Extract interleaved paragraphs and display math from body nodes.
-     * Returns ContentBlock[]: strings are paragraph HTML, MathBlockData are equations.
+     * Extract all content blocks in document order: paragraphs, display math,
+     * theorems, and figures interleaved as they appear in the source.
      */
     private extractContent;
-    /** Extract theorems from body nodes. */
-    private extractTheorems;
-    /** Extract figures from body nodes. */
-    private extractFigures;
     private transformTheorem;
     /** Convert a single AST node to HTML string. */
     nodeToHtml(node: LatexNode): string;

@@ -1,25 +1,29 @@
-import "./chunk-BIMEYU5A.js";
+import "./chunk-ZMNCURDE.js";
 import {
   DEFAULT_MACROS,
   Transformer,
   cleanRawLatex,
   transformDocument,
   validateOutput
-} from "./chunk-4LCLO5SZ.js";
+} from "./chunk-C32DNXCE.js";
 import {
   LabelRegistry,
   astToText,
+  estimatePaperSectionHeight,
+  flattenPaperSections,
   parseBibString,
   parseBibToMap,
   parseInlineString,
   parseLatex
-} from "./chunk-O3YJJZOY.js";
+} from "./chunk-H5ZLAB63.js";
 export {
   DEFAULT_MACROS,
   LabelRegistry,
   Transformer,
   astToText,
   cleanRawLatex,
+  estimatePaperSectionHeight,
+  flattenPaperSections,
   parseBibString,
   parseBibToMap,
   parseInlineString,

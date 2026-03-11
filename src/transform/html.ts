@@ -15,6 +15,8 @@ import type {
     PaperFigureData,
     PaperLabelInfo,
     ContentBlock,
+    TheoremBlock,
+    FigureBlock,
 } from "../types/output";
 import type { BibEntry } from "../types/bibtex";
 import { LabelRegistry } from "./labels";
@@ -84,6 +86,7 @@ export class Transformer {
         interface SectionRange {
             level: number; // 0=chapter, 1=section, 2=subsection
             title: string;
+            starred: boolean;
             startIdx: number;
             endIdx: number;
         }
@@ -99,6 +102,7 @@ export class Transformer {
                     title: cleanRawLatex(astToText(node.title), (key) =>
                         this.labels.resolve(key)?.number,
                     ),
+                    starred: node.starred,
                     startIdx: i + 1,
                     endIdx: nodes.length,
                 });
@@ -123,8 +127,13 @@ export class Transformer {
             const bodyNodes = nodes.slice(range.startIdx, range.endIdx);
             const id = slugify(range.title);
             const content = this.extractContent(bodyNodes);
-            const theorems = this.extractTheorems(bodyNodes);
-            const figures = this.extractFigures(bodyNodes);
+            // Derive theorems/figures arrays from the unified content stream
+            const theorems = content
+                .filter((b): b is TheoremBlock => typeof b === "object" && b !== null && "theorem" in b)
+                .map(b => b.theorem);
+            const figures = content
+                .filter((b): b is FigureBlock => typeof b === "object" && b !== null && "figure" in b)
+                .map(b => b.figure);
             const callout = callouts[id];
 
             // Tag all labels in this section's body with the section ID
@@ -139,6 +148,8 @@ export class Transformer {
                     id,
                     number: String(chapterNum),
                     title: range.title,
+                    sourceLevel: range.level,
+                    starred: range.starred,
                     content,
                     ...(theorems.length > 0 && { theorems }),
                     ...(figures.length > 0 && { figures }),
@@ -156,6 +167,8 @@ export class Transformer {
                         id,
                         number: String(chapterNum),
                         title: range.title,
+                        sourceLevel: range.level,
+                        starred: range.starred,
                         content,
                         ...(theorems.length > 0 && { theorems }),
                         ...(figures.length > 0 && { figures }),
@@ -168,6 +181,8 @@ export class Transformer {
                         id,
                         number: `${chapterNum}.${sectionNum}`,
                         title: range.title,
+                        sourceLevel: range.level,
+                        starred: range.starred,
                         content,
                         ...(theorems.length > 0 && { theorems }),
                         ...(figures.length > 0 && { figures }),
@@ -184,6 +199,8 @@ export class Transformer {
                         id,
                         number: `${chapterNum}.${sectionNum}`,
                         title: range.title,
+                        sourceLevel: range.level,
+                        starred: range.starred,
                         content,
                         ...(theorems.length > 0 && { theorems }),
                         ...(figures.length > 0 && { figures }),
@@ -200,6 +217,8 @@ export class Transformer {
                             id,
                             number: `${chapterNum}.${sectionNum}.${subsectionNum}`,
                             title: range.title,
+                            sourceLevel: range.level,
+                            starred: range.starred,
                             content,
                             ...(theorems.length > 0 && { theorems }),
                             ...(figures.length > 0 && { figures }),
@@ -301,8 +320,8 @@ export class Transformer {
     }
 
     /**
-     * Extract interleaved paragraphs and display math from body nodes.
-     * Returns ContentBlock[]: strings are paragraph HTML, MathBlockData are equations.
+     * Extract all content blocks in document order: paragraphs, display math,
+     * theorems, and figures interleaved as they appear in the source.
      */
     private extractContent(nodes: LatexNode[]): ContentBlock[] {
         const content: ContentBlock[] = [];
@@ -317,13 +336,30 @@ export class Transformer {
         };
 
         for (const node of nodes) {
-            // Skip nodes that are extracted separately (theorems, figures, proofs)
-            if (
-                node.type === "theorem" ||
-                node.type === "figure" ||
-                node.type === "proof" ||
-                node.type === "section"
-            ) {
+            // Skip structural nodes
+            if (node.type === "section" || node.type === "proof") {
+                continue;
+            }
+
+            // Theorem → flush text, emit inline
+            if (node.type === "theorem") {
+                flush();
+                const thm = this.transformTheorem(node as TheoremNode);
+                if (thm) content.push({ theorem: thm });
+                continue;
+            }
+
+            // Figure → flush text, emit inline
+            if (node.type === "figure" && (node as any).filename) {
+                flush();
+                const fig: PaperFigureData = {
+                    filename: (node as any).filename,
+                    caption: (node as any).caption
+                        ? this.nodesToHtml((node as any).caption)
+                        : "",
+                    ...((node as any).label && { label: (node as any).label }),
+                };
+                content.push({ figure: fig });
                 continue;
             }
 
@@ -350,39 +386,6 @@ export class Transformer {
 
         flush();
         return content;
-    }
-
-    /** Extract theorems from body nodes. */
-    private extractTheorems(nodes: LatexNode[]): PaperTheoremData[] {
-        const theorems: PaperTheoremData[] = [];
-
-        for (const node of nodes) {
-            if (node.type === "theorem") {
-                const thm = this.transformTheorem(node);
-                if (thm) theorems.push(thm);
-            }
-        }
-
-        return theorems;
-    }
-
-    /** Extract figures from body nodes. */
-    private extractFigures(nodes: LatexNode[]): PaperFigureData[] {
-        const figures: PaperFigureData[] = [];
-
-        for (const node of nodes) {
-            if (node.type === "figure" && node.filename) {
-                figures.push({
-                    filename: node.filename,
-                    caption: node.caption
-                        ? this.nodesToHtml(node.caption)
-                        : "",
-                    ...(node.label && { label: node.label }),
-                });
-            }
-        }
-
-        return figures;
     }
 
     private transformTheorem(node: TheoremNode): PaperTheoremData | null {

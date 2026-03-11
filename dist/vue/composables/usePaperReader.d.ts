@@ -21,6 +21,9 @@ export declare function usePaperReader(options?: {
     activeId: Ref<string | null, string | null>;
     activeRootId: import("vue").ComputedRef<string | null>;
     scrollTo: (id: string) => void;
+    forceRecalculate: () => void;
+    lockTracking: () => void;
+    unlockTracking: () => void;
     renderInline: (tex: string) => string;
     renderDisplay: (tex: string) => string;
     renderTitle: (text: string) => string;

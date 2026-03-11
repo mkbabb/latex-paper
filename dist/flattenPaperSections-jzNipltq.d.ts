@@ -18,15 +18,30 @@ interface MathBlockData {
     /** Element ID for scroll-to targeting (e.g. "eq-f3"). */
     id?: string;
 }
+/** Wrapper to embed a theorem in the content stream. */
+interface TheoremBlock {
+    theorem: PaperTheoremData;
+}
+/** Wrapper to embed a figure in the content stream. */
+interface FigureBlock {
+    figure: PaperFigureData;
+}
 /**
- * A content block is either a paragraph (HTML string) or a display math block.
- * Use `typeof block === "string"` to distinguish.
+ * A content block in document order.
+ * - `string` → paragraph HTML
+ * - `MathBlockData` → display equation (has `.tex`)
+ * - `TheoremBlock` → theorem/definition/lemma (has `.theorem`)
+ * - `FigureBlock` → figure (has `.figure`)
  */
-type ContentBlock = string | MathBlockData;
+type ContentBlock = string | MathBlockData | TheoremBlock | FigureBlock;
 interface PaperSectionData {
     id: string;
     number: string;
     title: string;
+    /** Original LaTeX sectioning level: 0=chapter, 1=section, 2=subsection, 3=subsubsection. */
+    sourceLevel?: number;
+    /** Whether the source heading used a starred LaTeX form (for example, \subsection*{...}). */
+    starred?: boolean;
     /**
      * Interleaved paragraphs and display equations in document order.
      * Strings are paragraph HTML; MathBlockData are display equations.
@@ -54,4 +69,19 @@ interface PaperLabelInfo {
     elementId?: string;
 }
 
-export type { ContentBlock as C, MathBlockData as M, PaperFigureData as P, PaperSectionData as a, PaperTheoremData as b, PaperLabelInfo as c };
+interface FlatPaperSection {
+    id: string;
+    index: number;
+    depth: number;
+    sourceLevel: number;
+    starred: boolean;
+    parentId: string | null;
+    rootId: string;
+    rootIndex: number;
+    section: PaperSectionData;
+    estimatedHeight: number;
+}
+declare function estimatePaperSectionHeight(section: PaperSectionData, depth: number): number;
+declare function flattenPaperSections(sections: PaperSectionData[]): FlatPaperSection[];
+
+export { type ContentBlock as C, type FigureBlock as F, type MathBlockData as M, type PaperFigureData as P, type TheoremBlock as T, type PaperSectionData as a, type PaperTheoremData as b, type PaperLabelInfo as c, type FlatPaperSection as d, estimatePaperSectionHeight as e, flattenPaperSections as f };

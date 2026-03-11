@@ -1,6 +1,10 @@
 # latex-paper
 
-LaTeX-to-structured-HTML parser and transformer. Parses `.tex` and `.bib` files into a typed AST, transforms that AST into hierarchical `PaperSectionData` for rendering academic papers on the web.
+LaTeX in, navigable paper data out.
+
+`latex-paper` parses `.tex` and `.bib`, resolves labels and citations, builds a typed section tree, and can expose the result as a Vite virtual module. The Vue entry point adds the rendering and windowing primitives used by the paper view in `fourier-analysis`.
+
+See [docs/virtual-paper.md](docs/virtual-paper.md) for the end-to-end path.
 
 ## Install
 
@@ -8,175 +12,86 @@ LaTeX-to-structured-HTML parser and transformer. Parses `.tex` and `.bib` files 
 npm install @mkbabb/latex-paper
 ```
 
-## Quick Start
+## Entry points
+
+| Export | Purpose |
+| --- | --- |
+| `@mkbabb/latex-paper` | Pure parser types and helpers |
+| `@mkbabb/latex-paper/transform` | AST → `PaperSectionData[]` transform |
+| `@mkbabb/latex-paper/vite` | Build-time virtual module for paper content |
+| `@mkbabb/latex-paper/vue` | Vue components and virtual-window composables |
+| `@mkbabb/latex-paper/theme` | Base paper styles |
+
+## Core path
+
+1. `parseLatex()` builds the AST.
+2. `Transformer` turns that AST into `PaperSectionData[]`, interleaving prose, display math, theorems, and figures as `content` blocks.
+3. `flattenPaperSections()` derives a stable depth-first list with hierarchy metadata and height estimates.
+4. `useVirtualSectionWindow()` turns that flat list into a bounded render window with top and bottom spacers.
+5. `latexPaperPlugin()` emits `paperSections`, `labelMap`, `pageMap`, and `totalPages` through `virtual:paper-content`.
+
+The page map is ordered, not title-matched. It is built from LaTeX TOC artifacts, so math-heavy headings no longer fall back to page `1`.
+
+## Quick start
 
 ```ts
-import { parseLatex, parseBibToMap } from "@mkbabb/latex-paper";
-import { transformDocument } from "@mkbabb/latex-paper/transform";
-
-const ast = parseLatex(texSource);
-const { sections, labelMap } = transformDocument(ast, {
-    bibEntries: parseBibToMap(bibSource),
-});
-```
-
-Math is preserved as raw TeX strings (`$x^2$`, `\begin{align}...`), leaving rendering to the consumer. KaTeX is an optional peer dependency.
-
-## Entry Points
-
-Three subpath exports with increasing dependency footprint:
-
-| Export | Source | Includes |
-|---|---|---|
-| `@mkbabb/latex-paper` | `src/index.ts` | Pure parser: AST types, `parseLatex`, `parseBibString`, `LabelRegistry` |
-| `@mkbabb/latex-paper/transform` | `src/transform.ts` | Re-exports above + `Transformer`, `transformDocument`, `cleanRawLatex`, `validateOutput` |
-| `@mkbabb/latex-paper/vite` | `src/vite.ts` | Vite plugin: build-time parse+transform, virtual module, HMR |
-
-## Structure
-
-```
-src/
-├── index.ts                # Pure parser entry point (no KaTeX)
-├── transform.ts            # Parser + AST→HTML transformer
-├── vite.ts                 # Vite plugin
-├── types/
-│   ├── ast.ts              # LatexNode discriminated union (15 node types)
-│   ├── bibtex.ts           # BibEntry interface
-│   └── output.ts           # PaperSectionData, PaperTheoremData, PaperFigureData, PaperLabelInfo
-├── grammar/
-│   ├── primitives.ts       # Shared parser primitives, lazy inlineNode registration
-│   ├── compile.ts          # BBNF grammar compilation
-│   ├── document.ts         # Top-level inlineNode dispatch, parseLatex(), astToText()
-│   ├── text.ts             # Plain text, dashes, smart quotes, accents, symbols→Unicode
-│   ├── math.ts             # Inline/display math delimiters, math environments
-│   ├── commands.ts         # Sections, formatting, refs, cites, figures, &c.
-│   └── environments.ts     # \begin{X}...\end{X} context-sensitive dispatch
-├── transform/
-│   ├── html.ts             # Transformer class, cleanRawLatex, validateOutput
-│   └── labels.ts           # LabelRegistry: two-pass cross-reference resolution
-├── bibtex/
-│   └── parser.ts           # BibTeX parser (regex-based)
-└── utils/
-    └── accents.ts          # LaTeX accent→Unicode maps
-
-grammar/                    # BBNF grammar files (loaded as raw text by tsup)
-├── latex-tokens.bbnf
-├── latex-commands.bbnf
-└── bibtex.bbnf
-```
-
-## Parsing
-
-### LaTeX
-
-Built on [`@mkbabb/parse-that`](https://github.com/mkbabb/parse-that) combinators and [`@mkbabb/bbnf-lang`](https://github.com/mkbabb/bbnf-lang) for grammar compilation. LaTeX is context-sensitive—environment names determine how bodies are parsed, commands have heterogeneous argument structures—so the actual dispatch is hand-written combinators while the BBNF grammars define token-level structure.
-
-`parseLatex(source)` loops over an `inlineNode` dispatch parser trying each sub-parser in priority order: comments, paragraph breaks, display/inline math, typography (`---`→em dash, `--`→en dash, smart quotes), environments, sections, accents, formatting, references, citations, skip/spacing commands, escaped characters, then plain text as catch-all.
-
-Environments dispatch context-sensitively via `.chain()` on the name: math envs (`equation`, `align`, `gather`, &c.) capture raw content; theorem-like envs produce `TheoremNode`s; lists split on `\item`; figures extract `\includegraphics`/`\caption`/`\label`; and unsupported envs (`center`, `tabular`, `tikzpicture`, &c.) are consumed and discarded.
-
-### BibTeX
-
-`parseBibString(source)` extracts entries via regex, cleans LaTeX accents to Unicode, and computes `shortAuthor` (last name, or last name + "et al." for multiple authors).
-
-```ts
-const bib = parseBibToMap(bibSource);
-bib.get("fourier1822"); // => { key, type, author, shortAuthor, year, title, fields }
-```
-
-## Transformation
-
-`LabelRegistry` performs two-pass cross-reference resolution: walks the AST counting sections/theorems/figures/equations, assigns hierarchical numbers (e.g., `"2.3"` for theorem 3 in chapter 2), and resets sub-counters on new chapters.
-
-The `Transformer` class converts the flat AST into hierarchical `PaperSectionData[]`: builds chapter/section/subsection hierarchy with auto-numbering, extracts paragraphs as HTML, extracts theorems and figures into their respective data types, resolves `\cite` to `[Author, Year]`, resolves `\ref`/`\eqref`/`\hyperref` to `<a class="paper-ref">` links, and converts formatting commands to HTML (`\textbf`→`<strong>`, `\emph`→`<em>`, `\texttt`→`<code>`, &c.).
-
-`cleanRawLatex()` is a fallback for residual LaTeX patterns in text nodes. `validateOutput()` scans transformed output for unprocessed LaTeX and returns `ValidationIssue[]`.
-
-## Vite Plugin
-
-Build-time integration. Parses `.tex` and `.bib`, runs the full pipeline, and exposes a virtual module:
-
-```ts
-// vite.config.ts
-import latexPaper from "@mkbabb/latex-paper/vite";
+import latexPaperPlugin from "@mkbabb/latex-paper/vite";
 
 export default {
     plugins: [
-        latexPaper({
+        latexPaperPlugin({
             texPath: "paper/main.tex",
-            bibPath: "paper/refs.bib",       // defaults to texPath with .bib extension
-            macros: {},                       // KaTeX macro definitions
-            callouts: {                       // section slug → { text, link }
-                applications: { text: "See the demo", link: "/demo" },
-            },
-            virtualModuleId: "virtual:paper-content", // default
+            bibPath: "paper/refs.bib",
         }),
     ],
 };
 ```
 
 ```ts
-import { paperSections, labelMap } from "virtual:paper-content";
+import { paperSections, labelMap, pageMap, totalPages } from "virtual:paper-content";
 ```
 
-Watches both files and invalidates on change (HMR).
+## Vue primitives
 
-## Output Types
+- `PaperSection` renders the heading shell.
+- `PaperSectionBlocks` renders one section body without recursive subsection mounting.
+- `flattenPaperSections()` exposes `id`, `index`, `depth`, `parentId`, `rootId`, `sourceLevel`, `starred`, and `estimatedHeight`.
+- `useVirtualSectionWindow()` returns the visible slice, spacer sizes, active section state, and offset helpers for scroll navigation.
+
+## Output shape
 
 ```ts
 interface PaperSectionData {
-    id: string;                          // slugified title
-    number: string;                      // "1", "1.2", "1.2.3"
+    id: string;
+    number: string;
     title: string;
-    paragraphs: string[];                // HTML strings
+    sourceLevel?: number;
+    starred?: boolean;
+    content: ContentBlock[];
     theorems?: PaperTheoremData[];
     figures?: PaperFigureData[];
-    subsections?: PaperSectionData[];    // recursive
+    subsections?: PaperSectionData[];
     callout?: { text: string; link: string };
-}
-
-interface PaperTheoremData {
-    type: "theorem" | "definition" | "lemma" | "proposition"
-        | "corollary" | "aside" | "example";
-    name?: string;
-    body: string;                        // HTML
-    math?: string[];                     // display math TeX strings
-    label?: string;
-}
-
-interface PaperFigureData {
-    filename: string;
-    caption: string;                     // HTML
-    label?: string;
-}
-
-interface PaperLabelInfo {
-    number: string;                      // e.g. "2.3"
-    type: "section" | "theorem" | "figure" | "equation";
-    sectionId: string;
+    summary?: string;
 }
 ```
 
-The parser produces a `LatexNode` discriminated union of 15 node types. See [`src/types/ast.ts`](src/types/ast.ts).
+`ContentBlock` is one of:
 
-## Build & Development
+- paragraph HTML string
+- display-math block
+- theorem block
+- figure block
 
-```sh
-npm run build           # library → dist/ (ESM + .d.ts)
-npm test                # vitest run
-npm run test:watch      # vitest (watch mode)
-npm run test:coverage   # vitest with coverage
+## Development
+
+```bash
+npm test
+npm run build
+npm pack
 ```
 
-**Dependencies:** [`@mkbabb/parse-that`](https://github.com/mkbabb/parse-that) (parser combinators), [`@mkbabb/bbnf-lang`](https://github.com/mkbabb/bbnf-lang) (grammar compiler).
+## Notes
 
-**Peer dependencies (optional):** `katex` ^0.16, `vite` ^6.0 || ^7.0.
-
-**TypeScript:** `strict: true`, `verbatimModuleSyntax: true`, `target: ES2022`, `moduleResolution: bundler`.
-
-## Sources, acknowledgements, &c.
-
-- [`@mkbabb/parse-that`](https://github.com/mkbabb/parse-that) — Parser combinators powering the LaTeX grammar.
-- [`@mkbabb/bbnf-lang`](https://github.com/mkbabb/bbnf-lang) — BBNF grammar compiler for token-level definitions.
-- [KaTeX](https://katex.org/) — Math typesetting for the web.
-- [Vite](https://vite.dev/) — Build tool; the plugin targets its plugin API.
+- KaTeX is optional at the package level and used by the Vue entry point.
+- The library ships built `dist/` artifacts and a packed tarball because `fourier-analysis` consumes it through the vendored tarball workflow.

@@ -1,8 +1,11 @@
 import type {
+    CodeBlock,
     ContentBlock,
     FigureBlock,
     MathBlockData,
+    PaperNestedBlock,
     PaperSectionData,
+    ProofBlock,
     TheoremBlock,
 } from "../types/output";
 
@@ -45,11 +48,26 @@ function estimateBlockHeight(block: ContentBlock): number {
     }
     if ("theorem" in block) {
         const theorem = (block as TheoremBlock).theorem;
-        const mathCount = theorem.math?.length ?? 0;
-        return 140 + estimateTextHeight(theorem.body) + mathCount * 96;
+        return 140 + estimateNestedContentHeight(theorem.content);
+    }
+    if ("code" in block) {
+        const codeBlock = (block as CodeBlock).code;
+        const lines = codeBlock.code.split("\n").length;
+        return 96 + lines * 22 + (codeBlock.caption ? estimateTextHeight(codeBlock.caption) : 0);
+    }
+    if ("proof" in block) {
+        const proof = (block as ProofBlock).proof;
+        return 120 + estimateNestedContentHeight(proof.content);
     }
     const math = block as MathBlockData;
     return 104 + Math.min(120, Math.ceil(math.tex.length / 120) * 16);
+}
+
+function estimateNestedContentHeight(blocks: PaperNestedBlock[]): number {
+    return blocks.reduce((sum, block) => {
+        if (typeof block === "string") return sum + estimateTextHeight(block);
+        return sum + estimateBlockHeight(block);
+    }, 0);
 }
 
 export function estimatePaperSectionHeight(

@@ -28,7 +28,7 @@ npm install @mkbabb/latex-paper
 2. `Transformer` turns that AST into `PaperSectionData[]`, interleaving prose, display math, theorems, and figures as `content` blocks.
 3. `flattenPaperSections()` derives a stable depth-first list with hierarchy metadata and height estimates.
 4. `useVirtualSectionWindow()` turns that flat list into a bounded render window with top and bottom spacers.
-5. `latexPaperPlugin()` emits `paperSections`, `labelMap`, `pageMap`, and `totalPages` through `virtual:paper-content`.
+5. `latexPaperPlugin()` emits `paperSections`, `labelMap`, `pageMap`, `totalPages`, and `extractedMacros` through `virtual:paper-content`.
 
 The page map is ordered, not title-matched. It is built from LaTeX TOC artifacts, so math-heavy headings no longer fall back to page `1`.
 
@@ -48,15 +48,18 @@ export default {
 ```
 
 ```ts
-import { paperSections, labelMap, pageMap, totalPages } from "virtual:paper-content";
+import { paperSections, labelMap, pageMap, totalPages, extractedMacros } from "virtual:paper-content";
 ```
 
 ## Vue primitives
 
-- `PaperSection` renders the heading shell.
-- `PaperSectionBlocks` renders one section body without recursive subsection mounting.
-- `flattenPaperSections()` exposes `id`, `index`, `depth`, `parentId`, `rootId`, `sourceLevel`, `starred`, and `estimatedHeight`.
-- `useVirtualSectionWindow()` returns the visible slice, spacer sizes, active section state, and offset helpers for scroll navigation.
+**Components**—`PaperSection`, `PaperSectionBlocks`, `PaperSectionContent`, `MathBlock`, `MathInline`, `Theorem`, `CodeBlock`. These cover headings, section bodies, display/inline math, theorems, and code listings.
+
+**Composables**—`usePaperReader`, `useVirtualSectionWindow`, `useSidebarFollow`, `useKatex`, `flattenPaperSections`. Reader setup, virtual windowing, sidebar scroll tracking, KaTeX rendering, and tree flattening.
+
+**Tracking primitives**—`useLazyLoader`, `useTreeIndex`, `useScrollTracker`, `useScrollTo`, `useClickDelegate`. Generic scroll and intersection utilities used by the composables above.
+
+**Context**—`PAPER_CONTEXT` and `createRenderTitle` for dependency injection across the component tree.
 
 ## Output shape
 
@@ -70,6 +73,8 @@ interface PaperSectionData {
     content: ContentBlock[];
     theorems?: PaperTheoremData[];
     figures?: PaperFigureData[];
+    codeBlocks?: PaperCodeBlockData[];
+    proofs?: PaperProofData[];
     subsections?: PaperSectionData[];
     callout?: { text: string; link: string };
     summary?: string;
@@ -79,9 +84,11 @@ interface PaperSectionData {
 `ContentBlock` is one of:
 
 - paragraph HTML string
-- display-math block
-- theorem block
-- figure block
+- `MathBlockData`—display equation
+- `TheoremBlock`—theorem, definition, lemma, etc.
+- `FigureBlock`—figure with caption
+- `CodeBlock`—code listing
+- `ProofBlock`—proof body
 
 ## Development
 
@@ -94,4 +101,3 @@ npm pack
 ## Notes
 
 - KaTeX is optional at the package level and used by the Vue entry point.
-- The library ships built `dist/` artifacts and a packed tarball because `fourier-analysis` consumes it through the vendored tarball workflow.

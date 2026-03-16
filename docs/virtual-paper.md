@@ -1,6 +1,6 @@
 # Virtual paper pipeline
 
-This is the paper path, stripped to the load-bearing parts.
+End-to-end overview of how LaTeX source becomes navigable, virtualized paper content.
 
 ## 1. Parse
 
@@ -67,7 +67,9 @@ This keeps the DOM small without losing deterministic scroll math.
 `latexPaperPlugin()` reads LaTeX build artifacts:
 
 - `.log` for `totalPages`
-- `.aux` TOC entries for ordered section pages
+- `.toc` for ordered section pages
+- `.aux` for label data
+- `.bbl` for bibliography
 
 `buildPageMapFromTocEntries()` assigns pages by traversal order, not by slugged title text. That matters for headings with inline math, braces, or symbols.
 
@@ -81,12 +83,6 @@ The Vite virtual module exposes:
 - `labelMap`
 - `pageMap`
 - `totalPages`
+- `extractedMacros`
 
-The consumer can then choose its own renderer. `fourier-analysis` uses the Vue entry point and drives section navigation from the flat list rather than from a fully mounted tree.
-
-## Why this is faster
-
-- The whole paper tree is no longer mounted at once.
-- Active-section tracking is computed from layout state, not from a forest of live observers.
-- Far jumps warm only a small neighborhood around the target.
-- Page numbers are stable because they are keyed to LaTeX’s own TOC order.
+The consumer can then choose its own renderer. `fourier-analysis` uses the Vue entry point and drives section navigation from the flat list.

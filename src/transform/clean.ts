@@ -110,8 +110,9 @@ function cleanProseSegment(
     // Spacing commands → space
     text = text.replace(/\\[,;:!]/g, " ");
     text = text.replace(/\\q?quad/g, " ");
-    text = text.replace(/\\\\/g, " ");
-    text = text.replace(/\\(?:newline|thinspace)(?![a-zA-Z])/g, " ");
+    text = text.replace(/\\\\/g, "<br />");
+    text = text.replace(/\\newline(?![a-zA-Z])/g, "<br />");
+    text = text.replace(/\\thinspace(?![a-zA-Z])/g, " ");
 
     // Skip/strip commands
     text = text.replace(/\\(?:noindent|hfill|centering)\s*/g, "");

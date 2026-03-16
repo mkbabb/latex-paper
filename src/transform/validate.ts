@@ -3,7 +3,7 @@
  * suspicious unprocessed LaTeX patterns.
  */
 
-import type { PaperSectionData } from "../types/output";
+import type { PaperNestedBlock, PaperSectionData } from "../types/output";
 
 /** Patterns that indicate unprocessed LaTeX in output. */
 const SUSPICIOUS_PATTERNS: Array<{ pattern: RegExp; description: string }> = [
@@ -54,6 +54,19 @@ export function validateOutput(sections: PaperSectionData[]): ValidationIssue[] 
         }
     }
 
+    function scanNestedBlocks(blocks: PaperNestedBlock[], path: string): void {
+        for (let i = 0; i < blocks.length; i++) {
+            const block = blocks[i];
+            if (typeof block === "string") {
+                scanText(block, `${path}/block[${i}]`);
+                continue;
+            }
+            if ("figure" in block) {
+                scanText(block.figure.caption, `${path}/figure[${i}]/caption`);
+            }
+        }
+    }
+
     function scanSection(section: PaperSectionData, prefix: string): void {
         const path = `${prefix}/${section.id}`;
         scanText(section.title, `${path}/title`);
@@ -67,12 +80,17 @@ export function validateOutput(sections: PaperSectionData[]): ValidationIssue[] 
             for (let i = 0; i < section.theorems.length; i++) {
                 const thm = section.theorems[i];
                 if (thm.name) scanText(thm.name, `${path}/theorem[${i}]/name`);
-                scanText(thm.body, `${path}/theorem[${i}]/body`);
+                scanNestedBlocks(thm.content, `${path}/theorem[${i}]`);
             }
         }
         if (section.figures) {
             for (let i = 0; i < section.figures.length; i++) {
                 scanText(section.figures[i].caption, `${path}/figure[${i}]/caption`);
+            }
+        }
+        if (section.proofs) {
+            for (let i = 0; i < section.proofs.length; i++) {
+                scanNestedBlocks(section.proofs[i].content, `${path}/proof[${i}]`);
             }
         }
         if (section.subsections) {

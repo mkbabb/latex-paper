@@ -26,6 +26,10 @@
 /* ── Math blocks ───────────────────────────────────────────── */
 
 .paper-article .math-block {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 1rem;
     overflow-x: auto;
     overflow-y: hidden;
     padding: 0.5rem 0;
@@ -35,6 +39,16 @@
     padding-left: 1rem;
     border-radius: 2px;
     transition: border-color 0.3s ease;
+}
+
+.paper-article .math-block__equation {
+    min-width: 0;
+}
+
+.paper-article .math-block__number {
+    font-size: 0.8rem;
+    color: hsl(var(--muted-foreground));
+    white-space: nowrap;
 }
 
 .paper-article .math-block:hover {
@@ -146,6 +160,21 @@
     color: hsl(var(--foreground) / 0.9);
 }
 
+.paper-article .theorem-body > :first-child,
+.paper-article .paper-proof-body > :first-child {
+    margin-top: 0;
+}
+
+.paper-article .theorem-body > :last-child,
+.paper-article .paper-proof-body > :last-child {
+    margin-bottom: 0;
+}
+
+.paper-article .theorem-body p + p,
+.paper-article .paper-proof-body p + p {
+    margin-top: 0.9rem;
+}
+
 .paper-article .theorem-body--italic {
     font-style: italic;
 }
@@ -170,6 +199,245 @@
 
 .paper-article .paper-section:not(:last-child) {
     margin-bottom: 2rem;
+}
+
+/* ── Proofs and code ───────────────────────────────────────── */
+
+.paper-article .paper-proof-block {
+    margin: 1rem 0 1.25rem;
+    padding: 0.875rem 1rem;
+    border-left: 3px solid hsl(var(--border));
+    background: hsl(var(--card) / 0.6);
+    border-radius: 0.5rem;
+}
+
+.paper-article .paper-proof-label {
+    font-weight: 700;
+    font-variant: small-caps;
+    margin-bottom: 0.375rem;
+}
+
+.paper-article .paper-proof-body {
+    color: hsl(var(--foreground) / 0.92);
+    line-height: 1.75;
+}
+
+.paper-article .paper-code-block {
+    margin: 1rem 0 1.25rem;
+}
+
+.paper-article .paper-code-caption {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    color: hsl(var(--muted-foreground));
+}
+
+.paper-article .paper-code-pre {
+    margin: 0;
+    padding: 0.875rem 1rem;
+    overflow-x: auto;
+    border-radius: 0.5rem;
+    background: #ffffff;
+    border: 1px solid hsl(var(--border));
+    font-size: 0.875rem;
+    line-height: 1.6;
+}
+
+.paper-article .paper-code-pre.hljs {
+    color: #24292e;
+    background: #ffffff;
+}
+
+.dark .paper-article .paper-code-pre.hljs {
+    color: #c9d1d9;
+    background: #0d1117;
+}
+
+.paper-article .paper-code-pre code {
+    display: block;
+    white-space: pre;
+    font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.paper-article .hljs-keyword,
+.paper-article .hljs-meta .hljs-keyword,
+.paper-article .hljs-template-tag,
+.paper-article .hljs-type,
+.paper-article .hljs-variable.language_ {
+    color: #d73a49;
+}
+
+.paper-article .hljs-string,
+.paper-article .hljs-title,
+.paper-article .hljs-section,
+.paper-article .hljs-title.class_,
+.paper-article .hljs-title.class_.inherited__,
+.paper-article .hljs-title.function_ {
+    color: #6f42c1;
+}
+
+.paper-article .hljs-literal,
+.paper-article .hljs-meta,
+.paper-article .hljs-number,
+.paper-article .hljs-operator,
+.paper-article .hljs-variable,
+.paper-article .hljs-attr,
+.paper-article .hljs-attribute,
+.paper-article .hljs-selector-attr,
+.paper-article .hljs-selector-class,
+.paper-article .hljs-selector-id {
+    color: #005cc5;
+}
+
+.paper-article .hljs-regexp,
+.paper-article .hljs-meta .hljs-string,
+.paper-article .hljs-string {
+    color: #032f62;
+}
+
+.paper-article .hljs-built_in,
+.paper-article .hljs-symbol,
+.paper-article .hljs-bullet {
+    color: #e36209;
+}
+
+.paper-article .hljs-comment,
+.paper-article .hljs-code,
+.paper-article .hljs-formula {
+    color: #6a737d;
+}
+
+.paper-article .hljs-name,
+.paper-article .hljs-quote,
+.paper-article .hljs-selector-tag,
+.paper-article .hljs-selector-pseudo {
+    color: #22863a;
+}
+
+.paper-article .hljs-subst,
+.paper-article .hljs-punctuation,
+.paper-article .hljs-params,
+.paper-article .hljs-property,
+.paper-article .hljs-tag,
+.paper-article .hljs-char.escape_,
+.paper-article .hljs-link {
+    color: #24292e;
+}
+
+.paper-article .hljs-section {
+    font-weight: 700;
+}
+
+.dark .paper-article .hljs-comment {
+    color: #8b949e;
+}
+
+.dark .paper-article .hljs-tag {
+    color: #7ee787;
+}
+
+.dark .paper-article .hljs-subst,
+.dark .paper-article .hljs-punctuation,
+.dark .paper-article .hljs-operator,
+.dark .paper-article .hljs-params,
+.dark .paper-article .hljs-property {
+    color: #c9d1d9;
+}
+
+.dark .paper-article .hljs-operator {
+    opacity: 0.7;
+}
+
+.dark .paper-article .hljs-bullet,
+.dark .paper-article .hljs-variable,
+.dark .paper-article .hljs-template-variable,
+.dark .paper-article .hljs-selector-tag,
+.dark .paper-article .hljs-name,
+.dark .paper-article .hljs-deletion {
+    color: #ff7b72;
+}
+
+.dark .paper-article .hljs-symbol,
+.dark .paper-article .hljs-number,
+.dark .paper-article .hljs-link,
+.dark .paper-article .hljs-attr,
+.dark .paper-article .hljs-variable.constant_,
+.dark .paper-article .hljs-literal {
+    color: #79c0ff;
+}
+
+.dark .paper-article .hljs-title,
+.dark .paper-article .hljs-class .hljs-title,
+.dark .paper-article .hljs-title.class_ {
+    color: #d2a8ff;
+}
+
+.dark .paper-article .hljs-code,
+.dark .paper-article .hljs-addition,
+.dark .paper-article .hljs-title.class_.inherited__,
+.dark .paper-article .hljs-string {
+    color: #a5d6ff;
+}
+
+.dark .paper-article .hljs-built_in,
+.dark .paper-article .hljs-doctag,
+.dark .paper-article .hljs-quote,
+.dark .paper-article .hljs-keyword.hljs-atrule,
+.dark .paper-article .hljs-regexp {
+    color: #ffa657;
+}
+
+.dark .paper-article .hljs-function .hljs-title,
+.dark .paper-article .hljs-attribute,
+.dark .paper-article .hljs-title.function_,
+.dark .paper-article .hljs-section {
+    color: #d2a8ff;
+}
+
+.dark .paper-article .hljs-type,
+.dark .paper-article .hljs-template-tag,
+.dark .paper-article .diff .hljs-meta,
+.dark .paper-article .hljs-keyword {
+    color: #ff7b72;
+}
+
+.dark .paper-article .hljs-meta,
+.dark .paper-article .hljs-meta .hljs-keyword,
+.dark .paper-article .hljs-meta .hljs-string {
+    color: #7ee787;
+}
+
+.dark .paper-article .hljs-strong {
+    color: #7ee787;
+    font-weight: 700;
+}
+
+.dark .paper-article .hljs-emphasis {
+    color: #d2a8ff;
+    font-style: italic;
+}
+
+.paper-article .paper-bibliography {
+    margin: 1.5rem 0;
+}
+
+.paper-article .paper-bibliography-heading {
+    margin: 0 0 0.75rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.paper-article .paper-bibliography-list {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.paper-article .paper-bibliography-list li + li {
+    margin-top: 0.75rem;
+}
+
+.paper-article .paper-bib-title {
+    font-style: italic;
 }
 
 .paper-article .section-header--chapter {
@@ -353,10 +621,24 @@
     scroll-margin-top: 6rem;
 }
 
+.paper-article figure img {
+    max-width: 100%;
+    height: auto;
+}
+
 .paper-article figcaption {
     font-size: 0.875rem;
     color: hsl(var(--muted-foreground));
     text-align: center;
     max-width: 32rem;
     font-style: italic;
+}
+
+.paper-figure-placeholder {
+    width: 100%;
+    max-width: 32rem;
+    aspect-ratio: 4 / 3;
+    border-radius: 0.375rem;
+    border: 1px dashed hsl(var(--border));
+    background: hsl(var(--muted) / 0.3);
 }

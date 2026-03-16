@@ -14,7 +14,7 @@ const ctx = inject(PAPER_CONTEXT)!;
 </script>
 
 <template>
-    <section :id="id" class="paper-section" :style="(depth ?? 0) === 0 && sectionIndex != null ? { '--_section-color': `var(--section-color-${sectionIndex})` } : undefined">
+    <section :id="id" class="paper-section" :style="sectionIndex != null ? { '--_section-color': `var(--section-color-${sectionIndex})` } : undefined">
         <div
             class="section-header"
             :class="{
@@ -26,7 +26,7 @@ const ctx = inject(PAPER_CONTEXT)!;
                 :is="(depth ?? 0) > 0 ? 'h3' : 'h2'"
                 class="section-heading"
             >
-                <span class="section-number">{{ number }}.</span>
+                <span v-if="number" class="section-number">{{ number }}.</span>
                 <span class="section-title" v-html="ctx.renderTitle(title)" />
             </component>
             <div v-if="(depth ?? 0) === 0" class="section-divider" />

@@ -70,7 +70,7 @@ export function usePaperReader(options?: {
         resolve: (refKey) => {
             const info = labelMap[refKey];
             if (!info) return null;
-            return info.elementId ?? info.sectionId;
+            return info.anchorId ?? info.elementId ?? info.sectionId;
         },
         scrollTo,
     });

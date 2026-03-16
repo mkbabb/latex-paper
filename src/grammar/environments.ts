@@ -13,6 +13,7 @@ import type {
     FigureNode,
     ProofNode,
     QuoteNode,
+    CodeBlockNode,
 } from "../types/ast";
 import {
     braceBalanced,
@@ -143,10 +144,15 @@ function parseFigureEnv(): Parser<FigureNode> {
 // ── Proof environment ───────────────────────────────────────────────
 
 function parseProofEnv(): Parser<ProofNode> {
-    return nodesUntilEnd("proof").map((body) => ({
-        type: "proof" as const,
-        body,
-    }));
+    return ws
+        .next(bracketBalanced().opt())
+        .skip(ws)
+        .then(nodesUntilEnd("proof"))
+        .map(([name, body]) => ({
+            type: "proof" as const,
+            ...(name != null && { name }),
+            body,
+        }));
 }
 
 // ── Quote environment ───────────────────────────────────────────────
@@ -156,6 +162,74 @@ function parseQuoteEnv(): Parser<QuoteNode> {
         type: "quote" as const,
         body,
     }));
+}
+
+function splitOptionPairs(options: string): string[] {
+    const parts: string[] = [];
+    let current = "";
+    let braceDepth = 0;
+    let bracketDepth = 0;
+    let parenDepth = 0;
+
+    for (const ch of options) {
+        if (ch === "," && braceDepth === 0 && bracketDepth === 0 && parenDepth === 0) {
+            if (current.trim()) parts.push(current.trim());
+            current = "";
+            continue;
+        }
+
+        current += ch;
+        if (ch === "{") braceDepth++;
+        else if (ch === "}") braceDepth = Math.max(0, braceDepth - 1);
+        else if (ch === "[") bracketDepth++;
+        else if (ch === "]") bracketDepth = Math.max(0, bracketDepth - 1);
+        else if (ch === "(") parenDepth++;
+        else if (ch === ")") parenDepth = Math.max(0, parenDepth - 1);
+    }
+
+    if (current.trim()) parts.push(current.trim());
+    return parts;
+}
+
+function unwrapOptionValue(value: string): string {
+    const trimmed = value.trim();
+    if (
+        (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+        (trimmed.startsWith('"') && trimmed.endsWith('"'))
+    ) {
+        return trimmed.slice(1, -1).trim();
+    }
+    return trimmed;
+}
+
+function parseCodeBlockEnv(): Parser<CodeBlockNode> {
+    return ws
+        .next(bracketBalanced().opt())
+        .skip(ws)
+        .then(rawUntilEnd("lstlisting"))
+        .map(([options, code]) => {
+            const attrs: Pick<CodeBlockNode, "caption" | "language"> = {};
+
+            if (options) {
+                for (const part of splitOptionPairs(options)) {
+                    const eqIdx = part.indexOf("=");
+                    if (eqIdx === -1) continue;
+                    const key = part.slice(0, eqIdx).trim().toLowerCase();
+                    const value = unwrapOptionValue(part.slice(eqIdx + 1));
+                    if (key === "caption" && value) {
+                        attrs.caption = value;
+                    } else if (key === "language" && value) {
+                        attrs.language = value;
+                    }
+                }
+            }
+
+            return {
+                type: "codeBlock" as const,
+                code: code.replace(/^\n/, "").replace(/\n\s*$/, ""),
+                ...attrs,
+            };
+        });
 }
 
 // ── Raw/skip environments ───────────────────────────────────────────
@@ -170,7 +244,6 @@ const SKIP_ENVS = new Set([
     "titlepage",
     "minipage",
     "verbatim",
-    "lstlisting",
 ]);
 
 // ── Main environment dispatcher ─────────────────────────────────────
@@ -203,6 +276,9 @@ export const environment: Parser<LatexNode | null> = string("\\begin")
 
         // Quote
         if (envName === "quote" || envName === "quotation") return parseQuoteEnv();
+
+        // Code listings
+        if (envName === "lstlisting") return parseCodeBlockEnv();
 
         // Center (passthrough — parse body as nodes)
         if (envName === "center") {

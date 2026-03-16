@@ -99,10 +99,10 @@ export const escapedSpecial: Parser<TextNode> = string("\\")
 /** Escaped space: \  */
 export const escapedSpace: Parser<TextNode> = string("\\ ").map(() => textNode(" "));
 
-/** Line break: \\ → space */
+/** Line break: \\ → HTML break */
 export const lineBreak: Parser<TextNode> = string("\\\\")
     .skip(regex(/\s*/))
-    .map(() => textNode(" "));
+    .map(() => textNode("<br />"));
 
 /** Spacing commands: \, \; \: \! */
 export const spacingCmd: Parser<TextNode> = string("\\")

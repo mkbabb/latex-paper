@@ -36,6 +36,8 @@ export const displayMathDollar: Parser<MathNode> = string("$$")
         type: "math" as const,
         value: value.trim(),
         display: true,
+        environment: "$$",
+        numbered: false,
     }));
 
 /** Display math: \[...\] */
@@ -46,6 +48,8 @@ export const displayMathBracket: Parser<MathNode> = string("\\[")
         type: "math" as const,
         value: value.trim(),
         display: true,
+        environment: "\\[\\]",
+        numbered: false,
     }));
 
 /** Inline math: \(...\) */
@@ -74,6 +78,8 @@ export function mathEnvBody(
             type: "math" as const,
             value,
             display: true,
+            environment: envName,
+            numbered: !envName.endsWith("*") && envName !== "split",
             rawValue,
         };
     });

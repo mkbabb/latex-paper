@@ -66,9 +66,9 @@ export const formattingCommand: Parser<CommandNode> = regex(
 
 // ── References ──────────────────────────────────────────────────────
 
-/** Parse \ref{...}, \eqref{...} */
+/** Parse \ref{...}, \eqref{...}, \cref{...}, \autoref{...} */
 export const refCommand: Parser<CommandNode> = regex(
-    /\\(eqref|ref)(?![a-zA-Z])/,
+    /\\(eqref|cref|autoref|ref)(?![a-zA-Z])/,
 )
     .skip(ws)
     .then(braceBalanced())
@@ -158,11 +158,21 @@ export const paragraphCommand: Parser<CommandNode> = cmd("paragraph")
         args: [titleNodes],
     }));
 
+/** Parse \bibliography{...} */
+export const bibliographyCommand: Parser<CommandNode> = cmd("bibliography")
+    .skip(ws)
+    .next(braceBalanced())
+    .map((value) => ({
+        type: "command" as const,
+        name: "bibliography",
+        args: [[{ type: "text" as const, value }]],
+    }));
+
 // ── Skip/spacing commands ───────────────────────────────────────────
 
 /** Parse skip/spacing commands (no arguments, just consume). */
 export const skipCommand: Parser<null> = regex(
-    /\\(medskip|smallskip|bigskip|vfill|hfill|noindent|newline|centering|newpage|clearpage|cleardoublepage|maketitle|tableofcontents|bibliographystyle|bibliography|appendix|frontmatter|mainmatter|backmatter)(?![a-zA-Z])/,
+    /\\(medskip|smallskip|bigskip|vfill|hfill|noindent|newline|centering|newpage|clearpage|cleardoublepage|maketitle|tableofcontents|bibliographystyle|appendix|frontmatter|mainmatter|backmatter)(?![a-zA-Z])/,
 )
     .skip(ws)
     .skip(braceBalanced().opt())

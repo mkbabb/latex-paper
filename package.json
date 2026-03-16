@@ -35,7 +35,8 @@
     },
     "dependencies": {
         "@mkbabb/bbnf-lang": "^0.1.1",
-        "@mkbabb/parse-that": "^0.7.1"
+        "@mkbabb/parse-that": "^0.7.1",
+        "highlight.js": "^11.11.1"
     },
     "peerDependencies": {
         "katex": "^0.16",

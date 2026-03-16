@@ -1,6 +1,6 @@
 import { Plugin } from 'vite';
-import { f as flattenPaperSections } from './flattenPaperSections-jzNipltq.js';
-export { P as PaperFigureData, a as PaperSectionData, b as PaperTheoremData } from './flattenPaperSections-jzNipltq.js';
+import { f as flattenPaperSections, C as CompiledTocEntry } from './flattenPaperSections-CN98CCOQ.js';
+export { P as PaperFigureData, a as PaperSectionData, b as PaperTheoremData, p as parseLatexTocPages, c as parseTotalPages } from './flattenPaperSections-CN98CCOQ.js';
 
 /**
  * @mkbabb/latex-paper/vite — Vite plugin entry point.
@@ -9,17 +9,7 @@ export { P as PaperFigureData, a as PaperSectionData, b as PaperTheoremData } fr
  * structured paper content as a virtual module.
  */
 
-interface TocPageEntry {
-    type: "chapter" | "section" | "subsection";
-    page: number;
-}
-/**
- * Extract ordered TOC page numbers from LaTeX .aux output.
- * We only rely on entry order + page numbers, which is robust to inline math,
- * braces, and escaped symbols in section titles.
- */
-declare function parseLatexTocPages(auxSource: string): TocPageEntry[];
-declare function buildPageMapFromTocEntries(sections: Parameters<typeof flattenPaperSections>[0], tocEntries: readonly TocPageEntry[], warn?: (message: string) => void): Record<string, number>;
+declare function buildPageMapFromTocEntries(sections: Parameters<typeof flattenPaperSections>[0], tocEntries: readonly CompiledTocEntry[], warn?: (message: string) => void): Record<string, number>;
 interface LatexPaperPluginOptions {
     /** Path to the .tex file (absolute or relative to project root). */
     texPath: string;
@@ -37,4 +27,4 @@ interface LatexPaperPluginOptions {
 }
 declare function latexPaperPlugin(options: LatexPaperPluginOptions): Plugin;
 
-export { type LatexPaperPluginOptions, type TocPageEntry, buildPageMapFromTocEntries, latexPaperPlugin as default, parseLatexTocPages };
+export { type LatexPaperPluginOptions, buildPageMapFromTocEntries, latexPaperPlugin as default };

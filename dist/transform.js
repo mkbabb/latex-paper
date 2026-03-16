@@ -1,33 +1,45 @@
-import "./chunk-ZMNCURDE.js";
+import "./chunk-H6FMOA6B.js";
 import {
   DEFAULT_MACROS,
   Transformer,
   cleanRawLatex,
   transformDocument,
   validateOutput
-} from "./chunk-C32DNXCE.js";
+} from "./chunk-A7GY23HR.js";
 import {
   LabelRegistry,
   astToText,
+  createCompiledPaperMetadata,
   estimatePaperSectionHeight,
   flattenPaperSections,
   parseBibString,
   parseBibToMap,
+  parseBibliographyItems,
   parseInlineString,
-  parseLatex
-} from "./chunk-H5ZLAB63.js";
+  parseLatex,
+  parseLatexAuxLabels,
+  parseLatexLogTotalPages,
+  parseLatexTocEntries,
+  parseTheoremCounterConfigs
+} from "./chunk-5VAEDP55.js";
 export {
   DEFAULT_MACROS,
   LabelRegistry,
   Transformer,
   astToText,
   cleanRawLatex,
+  createCompiledPaperMetadata,
   estimatePaperSectionHeight,
   flattenPaperSections,
   parseBibString,
   parseBibToMap,
+  parseBibliographyItems,
   parseInlineString,
   parseLatex,
+  parseLatexAuxLabels,
+  parseLatexLogTotalPages,
+  parseLatexTocEntries,
+  parseTheoremCounterConfigs,
   transformDocument,
   validateOutput
 };

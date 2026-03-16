@@ -1,85 +1,5 @@
-export { C as ContentBlock, F as FigureBlock, d as FlatPaperSection, M as MathBlockData, P as PaperFigureData, c as PaperLabelInfo, a as PaperSectionData, b as PaperTheoremData, T as TheoremBlock, e as estimatePaperSectionHeight, f as flattenPaperSections } from './flattenPaperSections-jzNipltq.js';
-
-/** Discriminated union of all LaTeX AST node types. */
-interface TextNode {
-    type: "text";
-    value: string;
-}
-interface MathNode {
-    type: "math";
-    value: string;
-    display: boolean;
-    /** Original content before label stripping — used by label collection. */
-    rawValue?: string;
-}
-interface CommandNode {
-    type: "command";
-    name: string;
-    args: LatexNode[][];
-    optArgs?: LatexNode[][];
-}
-interface EnvironmentNode {
-    type: "environment";
-    name: string;
-    args?: LatexNode[][];
-    optArgs?: LatexNode[][];
-    body: LatexNode[];
-}
-interface GroupNode {
-    type: "group";
-    body: LatexNode[];
-}
-interface CommentNode {
-    type: "comment";
-    value: string;
-}
-interface ParagraphBreakNode {
-    type: "paragraphBreak";
-}
-interface SectionNode {
-    type: "section";
-    level: "chapter" | "section" | "subsection" | "subsubsection";
-    starred: boolean;
-    title: LatexNode[];
-}
-interface TheoremNode {
-    type: "theorem";
-    envType: string;
-    name?: LatexNode[];
-    body: LatexNode[];
-}
-interface ListNode {
-    type: "list";
-    ordered: boolean;
-    items: LatexNode[][];
-}
-interface DescriptionNode {
-    type: "description";
-    items: {
-        term: LatexNode[];
-        body: LatexNode[];
-    }[];
-}
-interface FigureNode {
-    type: "figure";
-    filename?: string;
-    caption?: LatexNode[];
-    label?: string;
-    options?: string;
-}
-interface ProofNode {
-    type: "proof";
-    body: LatexNode[];
-}
-interface QuoteNode {
-    type: "quote";
-    body: LatexNode[];
-}
-interface LabelNode {
-    type: "label";
-    key: string;
-}
-type LatexNode = TextNode | MathNode | CommandNode | EnvironmentNode | GroupNode | CommentNode | ParagraphBreakNode | SectionNode | TheoremNode | ListNode | DescriptionNode | FigureNode | ProofNode | QuoteNode | LabelNode;
+import { L as LatexNode } from './flattenPaperSections-CN98CCOQ.js';
+export { g as CodeBlock, h as CodeBlockNode, i as CommandNode, j as CommentNode, k as CompiledBibliographyItem, l as CompiledLabelEntry, d as CompiledPaperMetadata, C as CompiledTocEntry, m as ContentBlock, D as DescriptionNode, E as EnvironmentNode, F as FigureBlock, n as FigureNode, o as FlatPaperSection, G as GroupNode, q as LabelNode, r as ListNode, M as MathBlockData, s as MathNode, t as PaperCodeBlockData, P as PaperFigureData, e as PaperLabelInfo, u as PaperNestedBlock, v as PaperProofData, a as PaperSectionData, b as PaperTheoremData, w as ParagraphBreakNode, x as ProofBlock, y as ProofNode, Q as QuoteNode, S as SectionNode, T as TextNode, z as TheoremBlock, A as TheoremCounterConfig, B as TheoremNode, H as createCompiledPaperMetadata, I as estimatePaperSectionHeight, f as flattenPaperSections, J as parseBibliographyItems, K as parseLatexAuxLabels, c as parseLatexLogTotalPages, p as parseLatexTocEntries, N as parseTheoremCounterConfigs } from './flattenPaperSections-CN98CCOQ.js';
 
 interface BibEntry {
     key: string;
@@ -157,4 +77,4 @@ declare class LabelRegistry {
     private visitMath;
 }
 
-export { type BibEntry, type CommandNode, type CommentNode, type DescriptionNode, type EnvironmentNode, type FigureNode, type GroupNode, type LabelInfo, type LabelNode, LabelRegistry, type LatexNode, type ListNode, type MathNode, type ParagraphBreakNode, type ProofNode, type QuoteNode, type SectionNode, type TextNode, type TheoremNode, astToText, parseBibString, parseBibToMap, parseInlineString, parseLatex };
+export { type BibEntry, type LabelInfo, LabelRegistry, LatexNode, astToText, parseBibString, parseBibToMap, parseInlineString, parseLatex };

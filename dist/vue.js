@@ -459,7 +459,7 @@ function usePaperReader(options) {
     resolve: (refKey) => {
       const info = labelMap[refKey];
       if (!info) return null;
-      return info.elementId ?? info.sectionId;
+      return info.anchorId ?? info.elementId ?? info.sectionId;
     },
     scrollTo
   });
@@ -482,14 +482,206 @@ function usePaperReader(options) {
   };
 }
 
+// src/vue/composables/useSidebarFollow.ts
+import { nextTick as nextTick4, onMounted as onMounted4, onUnmounted as onUnmounted4, watch as watch3 } from "vue";
+function useSidebarFollow(options) {
+  const damping = options.damping ?? 0.22;
+  let followRaf = 0;
+  let syncRaf = 0;
+  let currentScrollSource = null;
+  let currentSidebar = null;
+  let targetScrollTop = null;
+  let manualOverride = false;
+  let programmaticScrollDepth = 0;
+  function suspendForManualInteraction() {
+    manualOverride = true;
+    targetScrollTop = null;
+    if (followRaf) {
+      cancelAnimationFrame(followRaf);
+      followRaf = 0;
+    }
+    if (syncRaf) {
+      cancelAnimationFrame(syncRaf);
+      syncRaf = 0;
+    }
+  }
+  function escapeSelector(value) {
+    if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+      return CSS.escape(value);
+    }
+    return value.replace(/["\\]/g, "\\$&");
+  }
+  function getActiveElement() {
+    const nav = options.sidebarEl.value;
+    const id = options.activeId.value ?? options.activeRootId?.value ?? null;
+    if (!nav || !id) return null;
+    return nav.querySelector(
+      `[data-toc-id="${escapeSelector(id)}"]`
+    );
+  }
+  function resolveTarget(nav, activeEl) {
+    const navHeight = nav.clientHeight;
+    const elementCenter = activeEl.offsetTop + activeEl.offsetHeight / 2;
+    const maxScrollTop = Math.max(0, nav.scrollHeight - navHeight);
+    const deadzone = navHeight * 0.18;
+    const currentCenter = nav.scrollTop + navHeight / 2;
+    if (Math.abs(elementCenter - currentCenter) <= deadzone) {
+      return nav.scrollTop;
+    }
+    return Math.max(0, Math.min(maxScrollTop, elementCenter - navHeight / 2));
+  }
+  function withProgrammaticScroll(fn) {
+    programmaticScrollDepth += 1;
+    try {
+      fn();
+    } finally {
+      requestAnimationFrame(() => {
+        programmaticScrollDepth = Math.max(0, programmaticScrollDepth - 1);
+      });
+    }
+  }
+  function follow() {
+    followRaf = 0;
+    if (manualOverride) return;
+    const nav = options.sidebarEl.value;
+    const target = targetScrollTop;
+    if (!nav || target == null) return;
+    const delta = target - nav.scrollTop;
+    if (Math.abs(delta) < 1) {
+      withProgrammaticScroll(() => {
+        nav.scrollTop = target;
+      });
+      targetScrollTop = null;
+      return;
+    }
+    withProgrammaticScroll(() => {
+      nav.scrollTop += delta * damping;
+    });
+    followRaf = requestAnimationFrame(follow);
+  }
+  function queue(immediate = false) {
+    if (!immediate && manualOverride) return;
+    const nav = options.sidebarEl.value;
+    const activeEl = getActiveElement();
+    if (!nav || !activeEl) return;
+    targetScrollTop = resolveTarget(nav, activeEl);
+    if (immediate) {
+      if (followRaf) {
+        cancelAnimationFrame(followRaf);
+        followRaf = 0;
+      }
+      withProgrammaticScroll(() => {
+        nav.scrollTop = targetScrollTop;
+      });
+      targetScrollTop = null;
+      return;
+    }
+    if (!followRaf) {
+      followRaf = requestAnimationFrame(follow);
+    }
+  }
+  function scheduleFromScroll() {
+    if (manualOverride) {
+      manualOverride = false;
+      targetScrollTop = null;
+    }
+    if (syncRaf) return;
+    syncRaf = requestAnimationFrame(() => {
+      syncRaf = 0;
+      queue();
+    });
+  }
+  function handleSidebarWheel() {
+    suspendForManualInteraction();
+  }
+  function handleSidebarTouch() {
+    suspendForManualInteraction();
+  }
+  function handleSidebarPointer(event) {
+    const target = event.target;
+    if (target?.closest("[data-toc-id], .sidebar-top-btn")) return;
+    suspendForManualInteraction();
+  }
+  function handleSidebarKeydown(event) {
+    if (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "PageUp" || event.key === "PageDown" || event.key === "Home" || event.key === "End" || event.key === " ") {
+      suspendForManualInteraction();
+    }
+  }
+  function handleSidebarScroll() {
+    if (programmaticScrollDepth > 0) return;
+    suspendForManualInteraction();
+  }
+  function bindSidebar(nav) {
+    if (currentSidebar === nav) return;
+    currentSidebar?.removeEventListener("wheel", handleSidebarWheel);
+    currentSidebar?.removeEventListener("scroll", handleSidebarScroll);
+    currentSidebar?.removeEventListener("touchstart", handleSidebarTouch);
+    currentSidebar?.removeEventListener("pointerdown", handleSidebarPointer);
+    currentSidebar?.removeEventListener("keydown", handleSidebarKeydown);
+    currentSidebar = nav;
+    currentSidebar?.addEventListener("wheel", handleSidebarWheel, { passive: true });
+    currentSidebar?.addEventListener("scroll", handleSidebarScroll, { passive: true });
+    currentSidebar?.addEventListener("touchstart", handleSidebarTouch, { passive: true });
+    currentSidebar?.addEventListener("pointerdown", handleSidebarPointer, { passive: true });
+    currentSidebar?.addEventListener("keydown", handleSidebarKeydown);
+  }
+  function bindScrollSource(source) {
+    if (currentScrollSource === source) return;
+    currentScrollSource?.removeEventListener("scroll", scheduleFromScroll);
+    currentScrollSource = source;
+    currentScrollSource?.addEventListener("scroll", scheduleFromScroll, {
+      passive: true
+    });
+  }
+  onMounted4(() => {
+    bindScrollSource(options.scrollSource?.value ?? null);
+    bindSidebar(options.sidebarEl.value ?? null);
+    nextTick4(() => queue(true));
+    window.addEventListener("resize", scheduleFromScroll);
+  });
+  watch3(
+    [options.activeId, options.activeRootId ?? { value: null }],
+    () => {
+      nextTick4(() => queue());
+    },
+    { flush: "post" }
+  );
+  watch3(
+    options.sidebarEl,
+    (sidebar) => {
+      bindSidebar(sidebar);
+    },
+    { immediate: true }
+  );
+  watch3(
+    () => options.scrollSource?.value ?? null,
+    (source) => {
+      bindScrollSource(source);
+    },
+    { immediate: true }
+  );
+  onUnmounted4(() => {
+    if (followRaf) cancelAnimationFrame(followRaf);
+    if (syncRaf) cancelAnimationFrame(syncRaf);
+    currentScrollSource?.removeEventListener("scroll", scheduleFromScroll);
+    currentSidebar?.removeEventListener("wheel", handleSidebarWheel);
+    currentSidebar?.removeEventListener("scroll", handleSidebarScroll);
+    currentSidebar?.removeEventListener("touchstart", handleSidebarTouch);
+    currentSidebar?.removeEventListener("pointerdown", handleSidebarPointer);
+    currentSidebar?.removeEventListener("keydown", handleSidebarKeydown);
+    window.removeEventListener("resize", scheduleFromScroll);
+  });
+  return { queueSidebarFollow: queue };
+}
+
 // src/vue/composables/useVirtualSectionWindow.ts
 import {
   computed as computed2,
-  onUnmounted as onUnmounted4,
+  onUnmounted as onUnmounted5,
   ref as ref3,
   shallowRef,
   toValue,
-  watch as watch3
+  watch as watch4
 } from "vue";
 
 // src/vue/composables/virtualSectionLayout.ts
@@ -740,7 +932,7 @@ function useVirtualSectionWindow(options) {
     attachContainerObserver(container);
     scheduleRecalculate();
   }
-  watch3(
+  watch4(
     items,
     (nextItems) => {
       itemIndex.clear();
@@ -756,16 +948,16 @@ function useVirtualSectionWindow(options) {
     },
     { immediate: true }
   );
-  watch3(
+  watch4(
     options.scrollContainer,
     (container) => bindContainer(container),
     { immediate: true }
   );
-  watch3(
+  watch4(
     () => toValue(options.leadingOffsetPx),
     () => scheduleRecalculate()
   );
-  onUnmounted4(() => {
+  onUnmounted5(() => {
     if (scrollRaf) cancelAnimationFrame(scrollRaf);
     if (recalcRaf) cancelAnimationFrame(recalcRaf);
     if (warmTimer) window.clearTimeout(warmTimer);
@@ -812,11 +1004,25 @@ function estimateBlockHeight(block) {
   }
   if ("theorem" in block) {
     const theorem = block.theorem;
-    const mathCount = theorem.math?.length ?? 0;
-    return 140 + estimateTextHeight(theorem.body) + mathCount * 96;
+    return 140 + estimateNestedContentHeight(theorem.content);
+  }
+  if ("code" in block) {
+    const codeBlock = block.code;
+    const lines = codeBlock.code.split("\n").length;
+    return 96 + lines * 22 + (codeBlock.caption ? estimateTextHeight(codeBlock.caption) : 0);
+  }
+  if ("proof" in block) {
+    const proof = block.proof;
+    return 120 + estimateNestedContentHeight(proof.content);
   }
   const math = block;
   return 104 + Math.min(120, Math.ceil(math.tex.length / 120) * 16);
+}
+function estimateNestedContentHeight(blocks) {
+  return blocks.reduce((sum, block) => {
+    if (typeof block === "string") return sum + estimateTextHeight(block);
+    return sum + estimateBlockHeight(block);
+  }, 0);
 }
 function estimatePaperSectionHeight(section, depth) {
   const headingHeight = depth === 0 ? 124 : depth === 1 ? 88 : 72;
@@ -871,7 +1077,9 @@ var MathBlock_default = /* @__PURE__ */ _defineComponent({
   __name: "MathBlock",
   props: {
     tex: { type: String, required: true },
-    id: { type: String, required: false }
+    id: { type: String, required: false },
+    number: { type: String, required: false },
+    numbered: { type: Boolean, required: false }
   },
   setup(__props, { expose: __expose }) {
     __expose();
@@ -885,13 +1093,29 @@ var MathBlock_default = /* @__PURE__ */ _defineComponent({
 });
 
 // sfc-template:/Users/mkbabb/Programming/latex-paper/src/vue/components/MathBlock.vue?type=template
-import { setBlockTracking as _setBlockTracking, createElementVNode as _createElementVNode } from "vue";
+import { setBlockTracking as _setBlockTracking, createElementVNode as _createElementVNode, toDisplayString as _toDisplayString, openBlock as _openBlock, createElementBlock as _createElementBlock, createCommentVNode as _createCommentVNode } from "vue";
+var _hoisted_1 = ["id"];
+var _hoisted_2 = {
+  key: 0,
+  class: "math-block__number fira-code"
+};
 function render(_ctx, _cache, $props, $setup, $data, $options) {
-  return _cache[0] || (_setBlockTracking(-1, true), (_cache[0] = _createElementVNode("div", {
+  return _openBlock(), _createElementBlock("div", {
     class: "math-block",
-    id: $props.id,
-    innerHTML: $setup.html
-  }, null, 8, ["id", "innerHTML"])).cacheIndex = 0, _setBlockTracking(1), _cache[0]);
+    id: $props.id
+  }, [
+    _cache[0] || (_setBlockTracking(-1, true), (_cache[0] = _createElementVNode("div", {
+      class: "math-block__equation",
+      innerHTML: $setup.html
+    }, null, 8, ["innerHTML"])).cacheIndex = 0, _setBlockTracking(1), _cache[0]),
+    $props.numbered && $props.number ? (_openBlock(), _createElementBlock(
+      "div",
+      _hoisted_2,
+      " (" + _toDisplayString($props.number) + ") ",
+      1
+      /* TEXT */
+    )) : _createCommentVNode("v-if", true)
+  ], 8, _hoisted_1);
 }
 
 // src/vue/components/MathBlock.vue
@@ -962,9 +1186,9 @@ var Theorem_default = /* @__PURE__ */ _defineComponent3({
 });
 
 // sfc-template:/Users/mkbabb/Programming/latex-paper/src/vue/components/Theorem.vue?type=template
-import { toDisplayString as _toDisplayString, createElementVNode as _createElementVNode3, openBlock as _openBlock, createElementBlock as _createElementBlock, createCommentVNode as _createCommentVNode, createTextVNode as _createTextVNode, Fragment as _Fragment, renderSlot as _renderSlot, normalizeClass as _normalizeClass } from "vue";
-var _hoisted_1 = ["id"];
-var _hoisted_2 = { class: "theorem-label" };
+import { toDisplayString as _toDisplayString2, createElementVNode as _createElementVNode3, openBlock as _openBlock2, createElementBlock as _createElementBlock2, createCommentVNode as _createCommentVNode2, createTextVNode as _createTextVNode, Fragment as _Fragment, renderSlot as _renderSlot, normalizeClass as _normalizeClass } from "vue";
+var _hoisted_12 = ["id"];
+var _hoisted_22 = { class: "theorem-label" };
 var _hoisted_3 = { class: "theorem-type" };
 var _hoisted_4 = {
   key: 0,
@@ -972,26 +1196,26 @@ var _hoisted_4 = {
 };
 var _hoisted_5 = ["innerHTML"];
 function render3(_ctx, _cache, $props, $setup, $data, $options) {
-  return _openBlock(), _createElementBlock("div", {
+  return _openBlock2(), _createElementBlock2("div", {
     id: $props.label ? $props.label.replace(/:/g, "-") : void 0,
     class: _normalizeClass(["theorem-block", `theorem-block--${$props.type}`])
   }, [
-    _createElementVNode3("p", _hoisted_2, [
+    _createElementVNode3("p", _hoisted_22, [
       _createElementVNode3(
         "span",
         _hoisted_3,
-        _toDisplayString($setup.labels[$props.type]),
+        _toDisplayString2($setup.labels[$props.type]),
         1
         /* TEXT */
       ),
-      $props.number ? (_openBlock(), _createElementBlock(
+      $props.number ? (_openBlock2(), _createElementBlock2(
         "span",
         _hoisted_4,
-        "\xA0" + _toDisplayString($props.number),
+        "\xA0" + _toDisplayString2($props.number),
         1
         /* TEXT */
-      )) : _createCommentVNode("v-if", true),
-      $props.name ? (_openBlock(), _createElementBlock(
+      )) : _createCommentVNode2("v-if", true),
+      $props.name ? (_openBlock2(), _createElementBlock2(
         _Fragment,
         { key: 1 },
         [
@@ -1007,7 +1231,7 @@ function render3(_ctx, _cache, $props, $setup, $data, $options) {
         ],
         64
         /* STABLE_FRAGMENT */
-      )) : _createCommentVNode("v-if", true)
+      )) : _createCommentVNode2("v-if", true)
     ]),
     _createElementVNode3(
       "div",
@@ -1022,7 +1246,7 @@ function render3(_ctx, _cache, $props, $setup, $data, $options) {
       2
       /* CLASS */
     )
-  ], 10, _hoisted_1);
+  ], 10, _hoisted_12);
 }
 
 // src/vue/components/Theorem.vue
@@ -1030,10 +1254,119 @@ Theorem_default.render = render3;
 Theorem_default.__file = "src/vue/components/Theorem.vue";
 var Theorem_default2 = Theorem_default;
 
-// sfc-script:/Users/mkbabb/Programming/latex-paper/src/vue/components/PaperSection.vue?type=script
+// sfc-script:/Users/mkbabb/Programming/latex-paper/src/vue/components/CodeBlock.vue?type=script
 import { defineComponent as _defineComponent4 } from "vue";
+import { computed as computed3 } from "vue";
+
+// src/vue/composables/useCodeHighlight.ts
+import hljs from "highlight.js/lib/core";
+import bash from "highlight.js/lib/languages/bash";
+import cpp from "highlight.js/lib/languages/cpp";
+import javascript from "highlight.js/lib/languages/javascript";
+import json from "highlight.js/lib/languages/json";
+import plaintext from "highlight.js/lib/languages/plaintext";
+import python from "highlight.js/lib/languages/python";
+import rust from "highlight.js/lib/languages/rust";
+import typescript from "highlight.js/lib/languages/typescript";
+var initialized = false;
+function ensureLanguages() {
+  if (initialized) return;
+  initialized = true;
+  hljs.registerLanguage("bash", bash);
+  hljs.registerLanguage("cpp", cpp);
+  hljs.registerLanguage("javascript", javascript);
+  hljs.registerLanguage("js", javascript);
+  hljs.registerLanguage("json", json);
+  hljs.registerLanguage("plaintext", plaintext);
+  hljs.registerLanguage("python", python);
+  hljs.registerLanguage("py", python);
+  hljs.registerLanguage("rust", rust);
+  hljs.registerLanguage("rs", rust);
+  hljs.registerLanguage("typescript", typescript);
+  hljs.registerLanguage("ts", typescript);
+}
+function escapeHtml(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function useCodeHighlight() {
+  ensureLanguages();
+  function highlight(code, language) {
+    try {
+      if (language && hljs.getLanguage(language)) {
+        return {
+          html: hljs.highlight(code, { language }).value,
+          language
+        };
+      }
+      const auto = hljs.highlightAuto(code);
+      return {
+        html: auto.value,
+        language: auto.language
+      };
+    } catch {
+      return {
+        html: escapeHtml(code),
+        language
+      };
+    }
+  }
+  return { highlight };
+}
+
+// sfc-script:/Users/mkbabb/Programming/latex-paper/src/vue/components/CodeBlock.vue?type=script
 import { inject as inject6 } from "vue";
-var PaperSection_default = /* @__PURE__ */ _defineComponent4({
+var CodeBlock_default = /* @__PURE__ */ _defineComponent4({
+  __name: "CodeBlock",
+  props: {
+    code: { type: String, required: true },
+    caption: { type: String, required: false },
+    language: { type: String, required: false }
+  },
+  setup(__props, { expose: __expose }) {
+    __expose();
+    const props = __props;
+    const ctx = inject6(PAPER_CONTEXT);
+    const { highlight } = useCodeHighlight();
+    const highlighted = computed3(() => highlight(props.code, props.language));
+    const __returned__ = { props, ctx, highlight, highlighted };
+    Object.defineProperty(__returned__, "__isScriptSetup", { enumerable: false, value: true });
+    return __returned__;
+  }
+});
+
+// sfc-template:/Users/mkbabb/Programming/latex-paper/src/vue/components/CodeBlock.vue?type=template
+import { openBlock as _openBlock3, createElementBlock as _createElementBlock3, createCommentVNode as _createCommentVNode3, createElementVNode as _createElementVNode4 } from "vue";
+var _hoisted_13 = { class: "paper-code-block" };
+var _hoisted_23 = ["innerHTML"];
+var _hoisted_32 = ["data-language"];
+var _hoisted_42 = ["innerHTML"];
+function render4(_ctx, _cache, $props, $setup, $data, $options) {
+  return _openBlock3(), _createElementBlock3("figure", _hoisted_13, [
+    $props.caption ? (_openBlock3(), _createElementBlock3("figcaption", {
+      key: 0,
+      class: "paper-code-caption",
+      innerHTML: $setup.ctx.renderTitle($props.caption)
+    }, null, 8, _hoisted_23)) : _createCommentVNode3("v-if", true),
+    _createElementVNode4("pre", {
+      class: "paper-code-pre hljs",
+      "data-language": $setup.highlighted.language || $props.language || void 0
+    }, [
+      _createElementVNode4("code", {
+        innerHTML: $setup.highlighted.html
+      }, null, 8, _hoisted_42)
+    ], 8, _hoisted_32)
+  ]);
+}
+
+// src/vue/components/CodeBlock.vue
+CodeBlock_default.render = render4;
+CodeBlock_default.__file = "src/vue/components/CodeBlock.vue";
+var CodeBlock_default2 = CodeBlock_default;
+
+// sfc-script:/Users/mkbabb/Programming/latex-paper/src/vue/components/PaperSection.vue?type=script
+import { defineComponent as _defineComponent5 } from "vue";
+import { inject as inject7 } from "vue";
+var PaperSection_default = /* @__PURE__ */ _defineComponent5({
   __name: "PaperSection",
   props: {
     id: { type: String, required: true },
@@ -1044,7 +1377,7 @@ var PaperSection_default = /* @__PURE__ */ _defineComponent4({
   },
   setup(__props, { expose: __expose }) {
     __expose();
-    const ctx = inject6(PAPER_CONTEXT);
+    const ctx = inject7(PAPER_CONTEXT);
     const __returned__ = { ctx };
     Object.defineProperty(__returned__, "__isScriptSetup", { enumerable: false, value: true });
     return __returned__;
@@ -1052,22 +1385,25 @@ var PaperSection_default = /* @__PURE__ */ _defineComponent4({
 });
 
 // sfc-template:/Users/mkbabb/Programming/latex-paper/src/vue/components/PaperSection.vue?type=template
-import { toDisplayString as _toDisplayString2, createElementVNode as _createElementVNode4, resolveDynamicComponent as _resolveDynamicComponent, withCtx as _withCtx, openBlock as _openBlock2, createBlock as _createBlock, createElementBlock as _createElementBlock2, createCommentVNode as _createCommentVNode2, normalizeClass as _normalizeClass2, renderSlot as _renderSlot2, normalizeStyle as _normalizeStyle } from "vue";
-var _hoisted_12 = ["id"];
-var _hoisted_22 = { class: "section-number" };
-var _hoisted_32 = ["innerHTML"];
-var _hoisted_42 = {
+import { toDisplayString as _toDisplayString3, openBlock as _openBlock4, createElementBlock as _createElementBlock4, createCommentVNode as _createCommentVNode4, createElementVNode as _createElementVNode5, resolveDynamicComponent as _resolveDynamicComponent, withCtx as _withCtx, createBlock as _createBlock, normalizeClass as _normalizeClass2, renderSlot as _renderSlot2, normalizeStyle as _normalizeStyle } from "vue";
+var _hoisted_14 = ["id"];
+var _hoisted_24 = {
+  key: 0,
+  class: "section-number"
+};
+var _hoisted_33 = ["innerHTML"];
+var _hoisted_43 = {
   key: 0,
   class: "section-divider"
 };
 var _hoisted_52 = { class: "section-body" };
-function render4(_ctx, _cache, $props, $setup, $data, $options) {
-  return _openBlock2(), _createElementBlock2("section", {
+function render5(_ctx, _cache, $props, $setup, $data, $options) {
+  return _openBlock4(), _createElementBlock4("section", {
     id: $props.id,
     class: "paper-section",
-    style: _normalizeStyle(($props.depth ?? 0) === 0 && $props.sectionIndex != null ? { "--_section-color": `var(--section-color-${$props.sectionIndex})` } : void 0)
+    style: _normalizeStyle($props.sectionIndex != null ? { "--_section-color": `var(--section-color-${$props.sectionIndex})` } : void 0)
   }, [
-    _createElementVNode4(
+    _createElementVNode5(
       "div",
       {
         class: _normalizeClass2(["section-header", {
@@ -1076,48 +1412,48 @@ function render4(_ctx, _cache, $props, $setup, $data, $options) {
         }])
       },
       [
-        (_openBlock2(), _createBlock(_resolveDynamicComponent(($props.depth ?? 0) > 0 ? "h3" : "h2"), { class: "section-heading" }, {
+        (_openBlock4(), _createBlock(_resolveDynamicComponent(($props.depth ?? 0) > 0 ? "h3" : "h2"), { class: "section-heading" }, {
           default: _withCtx(() => [
-            _createElementVNode4(
+            $props.number ? (_openBlock4(), _createElementBlock4(
               "span",
-              _hoisted_22,
-              _toDisplayString2($props.number) + ".",
+              _hoisted_24,
+              _toDisplayString3($props.number) + ".",
               1
               /* TEXT */
-            ),
-            _createElementVNode4("span", {
+            )) : _createCommentVNode4("v-if", true),
+            _createElementVNode5("span", {
               class: "section-title",
               innerHTML: $setup.ctx.renderTitle($props.title)
-            }, null, 8, _hoisted_32)
+            }, null, 8, _hoisted_33)
           ]),
           _: 1
           /* STABLE */
         })),
-        ($props.depth ?? 0) === 0 ? (_openBlock2(), _createElementBlock2("div", _hoisted_42)) : _createCommentVNode2("v-if", true)
+        ($props.depth ?? 0) === 0 ? (_openBlock4(), _createElementBlock4("div", _hoisted_43)) : _createCommentVNode4("v-if", true)
       ],
       2
       /* CLASS */
     ),
-    _createElementVNode4("div", _hoisted_52, [
+    _createElementVNode5("div", _hoisted_52, [
       _renderSlot2(_ctx.$slots, "default")
     ])
-  ], 12, _hoisted_12);
+  ], 12, _hoisted_14);
 }
 
 // src/vue/components/PaperSection.vue
-PaperSection_default.render = render4;
+PaperSection_default.render = render5;
 PaperSection_default.__file = "src/vue/components/PaperSection.vue";
 var PaperSection_default2 = PaperSection_default;
 
 // sfc-script:/Users/mkbabb/Programming/latex-paper/src/vue/components/PaperSectionBlocks.vue?type=script
-import { defineComponent as _defineComponent5 } from "vue";
-import { inject as inject7, provide, useSlots } from "vue";
+import { defineComponent as _defineComponent6 } from "vue";
+import { inject as inject8, provide, useSlots, reactive } from "vue";
 
 // src/vue/components/paperSectionSlots.ts
 var CONTENT_SLOTS = /* @__PURE__ */ Symbol("content-slots");
 
 // sfc-script:/Users/mkbabb/Programming/latex-paper/src/vue/components/PaperSectionBlocks.vue?type=script
-var PaperSectionBlocks_default = /* @__PURE__ */ _defineComponent5({
+var PaperSectionBlocks_default = /* @__PURE__ */ _defineComponent6({
   __name: "PaperSectionBlocks",
   props: {
     section: { type: Object, required: true }
@@ -1126,63 +1462,110 @@ var PaperSectionBlocks_default = /* @__PURE__ */ _defineComponent5({
     __expose();
     const props = __props;
     const ownSlots = useSlots();
-    const parentSlots = inject7(CONTENT_SLOTS, null);
+    const parentSlots = inject8(CONTENT_SLOTS, null);
     const effectiveSlots = parentSlots ?? ownSlots;
     provide(CONTENT_SLOTS, effectiveSlots);
-    const ctx = inject7(PAPER_CONTEXT);
+    const ctx = inject8(PAPER_CONTEXT);
+    const failedImages = reactive(/* @__PURE__ */ new Set());
+    function onImageError(filename) {
+      failedImages.add(filename);
+    }
     function renderParagraph(text) {
       return ctx.renderTitle(text);
     }
     function isBlockHtml(text) {
       return /^<(ol|ul|dl|blockquote|div)\b/.test(text.trim());
     }
-    const __returned__ = { props, ownSlots, parentSlots, effectiveSlots, ctx, renderParagraph, isBlockHtml, MathBlock: MathBlock_default2, Theorem: Theorem_default2 };
+    function renderNestedText(text) {
+      return ctx.renderTitle(text);
+    }
+    function nestedBlockKey(prefix, index, block) {
+      if (typeof block === "string") return `${prefix}-text-${index}`;
+      if ("figure" in block) return `${prefix}-figure-${block.figure.label ?? index}`;
+      if ("code" in block) return `${prefix}-code-${index}`;
+      const math = block;
+      return `${prefix}-math-${math.anchorId ?? math.id ?? index}`;
+    }
+    function figureId(label) {
+      return label ? label.replace(/:/g, "-") : void 0;
+    }
+    const __returned__ = { props, ownSlots, parentSlots, effectiveSlots, ctx, failedImages, onImageError, renderParagraph, isBlockHtml, renderNestedText, nestedBlockKey, figureId, CodeBlock: CodeBlock_default2, MathBlock: MathBlock_default2, Theorem: Theorem_default2 };
     Object.defineProperty(__returned__, "__isScriptSetup", { enumerable: false, value: true });
     return __returned__;
   }
 });
 
 // sfc-template:/Users/mkbabb/Programming/latex-paper/src/vue/components/PaperSectionBlocks.vue?type=template
-import { renderList as _renderList, Fragment as _Fragment2, openBlock as _openBlock3, createElementBlock as _createElementBlock3, createCommentVNode as _createCommentVNode3, createBlock as _createBlock2, withCtx as _withCtx2, resolveDynamicComponent as _resolveDynamicComponent2, toDisplayString as _toDisplayString3, createElementVNode as _createElementVNode5 } from "vue";
-var _hoisted_13 = ["innerHTML"];
-var _hoisted_23 = ["innerHTML"];
-var _hoisted_33 = ["innerHTML"];
-var _hoisted_43 = ["id"];
-var _hoisted_53 = ["src", "alt"];
-var _hoisted_6 = ["innerHTML"];
-var _hoisted_7 = {
+import { renderList as _renderList, Fragment as _Fragment2, openBlock as _openBlock5, createElementBlock as _createElementBlock5, createCommentVNode as _createCommentVNode5, resolveDynamicComponent as _resolveDynamicComponent2, createBlock as _createBlock2, toDisplayString as _toDisplayString4, withCtx as _withCtx2, createElementVNode as _createElementVNode6, createTextVNode as _createTextVNode2 } from "vue";
+var _hoisted_15 = ["innerHTML"];
+var _hoisted_25 = ["innerHTML"];
+var _hoisted_34 = ["innerHTML"];
+var _hoisted_44 = ["innerHTML"];
+var _hoisted_53 = ["id"];
+var _hoisted_6 = {
+  key: 1,
+  class: "paper-figure-placeholder"
+};
+var _hoisted_7 = ["src", "alt", "onError"];
+var _hoisted_8 = { key: 3 };
+var _hoisted_9 = { key: 0 };
+var _hoisted_10 = ["innerHTML"];
+var _hoisted_11 = ["id"];
+var _hoisted_122 = {
+  key: 1,
+  class: "paper-figure-placeholder"
+};
+var _hoisted_132 = ["src", "alt", "onError"];
+var _hoisted_142 = { key: 3 };
+var _hoisted_152 = { key: 0 };
+var _hoisted_16 = ["innerHTML"];
+var _hoisted_17 = {
+  key: 4,
+  class: "paper-proof-block"
+};
+var _hoisted_18 = { class: "paper-proof-label" };
+var _hoisted_19 = ["innerHTML"];
+var _hoisted_20 = { class: "paper-proof-body" };
+var _hoisted_21 = ["innerHTML"];
+var _hoisted_222 = ["innerHTML"];
+var _hoisted_232 = ["id"];
+var _hoisted_242 = ["src", "alt"];
+var _hoisted_252 = { key: 2 };
+var _hoisted_26 = { key: 0 };
+var _hoisted_27 = ["innerHTML"];
+var _hoisted_28 = {
   key: 1,
   class: "paper-callout"
 };
-var _hoisted_8 = ["href"];
-function render5(_ctx, _cache, $props, $setup, $data, $options) {
-  return _openBlock3(), _createElementBlock3(
+var _hoisted_29 = ["href"];
+function render6(_ctx, _cache, $props, $setup, $data, $options) {
+  return _openBlock5(), _createElementBlock5(
     _Fragment2,
     null,
     [
-      (_openBlock3(true), _createElementBlock3(
+      (_openBlock5(true), _createElementBlock5(
         _Fragment2,
         null,
         _renderList($props.section.content, (block, bi) => {
-          return _openBlock3(), _createElementBlock3(
+          return _openBlock5(), _createElementBlock5(
             _Fragment2,
             { key: bi },
             [
-              typeof block === "string" ? (_openBlock3(), _createElementBlock3(
+              typeof block === "string" ? (_openBlock5(), _createElementBlock5(
                 _Fragment2,
                 { key: 0 },
                 [
-                  $setup.isBlockHtml(block) ? (_openBlock3(), _createElementBlock3("div", {
+                  $setup.isBlockHtml(block) ? (_openBlock5(), _createElementBlock5("div", {
                     key: 0,
                     innerHTML: $setup.renderParagraph(block)
-                  }, null, 8, _hoisted_13)) : (_openBlock3(), _createElementBlock3("p", {
+                  }, null, 8, _hoisted_15)) : (_openBlock5(), _createElementBlock5("p", {
                     key: 1,
                     innerHTML: $setup.renderParagraph(block)
-                  }, null, 8, _hoisted_23))
+                  }, null, 8, _hoisted_25))
                 ],
                 64
                 /* STABLE_FRAGMENT */
-              )) : "theorem" in block ? (_openBlock3(), _createBlock2($setup["Theorem"], {
+              )) : "theorem" in block ? (_openBlock5(), _createBlock2($setup["Theorem"], {
                 key: 1,
                 type: block.theorem.type,
                 name: block.theorem.name,
@@ -1190,18 +1573,62 @@ function render5(_ctx, _cache, $props, $setup, $data, $options) {
                 label: block.theorem.label
               }, {
                 default: _withCtx2(() => [
-                  block.theorem.body.trim() ? (_openBlock3(), _createElementBlock3("p", {
-                    key: 0,
-                    innerHTML: $setup.renderParagraph(block.theorem.body)
-                  }, null, 8, _hoisted_33)) : _createCommentVNode3("v-if", true),
-                  (_openBlock3(true), _createElementBlock3(
+                  (_openBlock5(true), _createElementBlock5(
                     _Fragment2,
                     null,
-                    _renderList(block.theorem.math, (eq, ei) => {
-                      return _openBlock3(), _createBlock2($setup["MathBlock"], {
-                        key: ei,
-                        tex: eq
-                      }, null, 8, ["tex"]);
+                    _renderList(block.theorem.content, (nested, ni) => {
+                      return _openBlock5(), _createElementBlock5(
+                        _Fragment2,
+                        {
+                          key: $setup.nestedBlockKey(`theorem-${bi}`, ni, nested)
+                        },
+                        [
+                          typeof nested === "string" && $setup.isBlockHtml(nested) ? (_openBlock5(), _createElementBlock5("div", {
+                            key: 0,
+                            innerHTML: $setup.renderNestedText(nested)
+                          }, null, 8, _hoisted_34)) : typeof nested === "string" ? (_openBlock5(), _createElementBlock5("p", {
+                            key: 1,
+                            innerHTML: $setup.renderNestedText(nested)
+                          }, null, 8, _hoisted_44)) : "figure" in nested ? (_openBlock5(), _createElementBlock5("figure", {
+                            key: 2,
+                            id: $setup.figureId(nested.figure.label)
+                          }, [
+                            $setup.effectiveSlots.figure ? (_openBlock5(), _createBlock2(_resolveDynamicComponent2(() => $setup.effectiveSlots.figure({ figure: nested.figure, index: ni })), { key: 0 })) : $setup.failedImages.has(nested.figure.filename) ? (_openBlock5(), _createElementBlock5("div", _hoisted_6)) : (_openBlock5(), _createElementBlock5("img", {
+                              key: 2,
+                              src: `${$setup.ctx.assetBase}${nested.figure.filename}`,
+                              alt: nested.figure.caption,
+                              loading: "lazy",
+                              onError: ($event) => $setup.onImageError(nested.figure.filename)
+                            }, null, 40, _hoisted_7)),
+                            nested.figure.caption || nested.figure.number ? (_openBlock5(), _createElementBlock5("figcaption", _hoisted_8, [
+                              nested.figure.number ? (_openBlock5(), _createElementBlock5(
+                                "strong",
+                                _hoisted_9,
+                                "Figure " + _toDisplayString4(nested.figure.number) + ": ",
+                                1
+                                /* TEXT */
+                              )) : _createCommentVNode5("v-if", true),
+                              nested.figure.caption ? (_openBlock5(), _createElementBlock5("span", {
+                                key: 1,
+                                innerHTML: $setup.renderNestedText(nested.figure.caption)
+                              }, null, 8, _hoisted_10)) : _createCommentVNode5("v-if", true)
+                            ])) : _createCommentVNode5("v-if", true)
+                          ], 8, _hoisted_53)) : "code" in nested ? (_openBlock5(), _createBlock2($setup["CodeBlock"], {
+                            key: 3,
+                            code: nested.code.code,
+                            caption: nested.code.caption,
+                            language: nested.code.language
+                          }, null, 8, ["code", "caption", "language"])) : (_openBlock5(), _createBlock2($setup["MathBlock"], {
+                            key: 4,
+                            tex: nested.tex,
+                            id: nested.anchorId || nested.id,
+                            number: nested.number,
+                            numbered: nested.numbered
+                          }, null, 8, ["tex", "id", "number", "numbered"]))
+                        ],
+                        64
+                        /* STABLE_FRAGMENT */
+                      );
                     }),
                     128
                     /* KEYED_FRAGMENT */
@@ -1209,25 +1636,115 @@ function render5(_ctx, _cache, $props, $setup, $data, $options) {
                 ]),
                 _: 2
                 /* DYNAMIC */
-              }, 1032, ["type", "name", "number", "label"])) : "figure" in block ? (_openBlock3(), _createElementBlock3("figure", {
+              }, 1032, ["type", "name", "number", "label"])) : "figure" in block ? (_openBlock5(), _createElementBlock5("figure", {
                 key: 2,
-                id: block.figure.label ? block.figure.label.replace(/:/g, "-") : void 0
+                id: $setup.figureId(block.figure.label)
               }, [
-                $setup.effectiveSlots.figure ? (_openBlock3(), _createBlock2(_resolveDynamicComponent2(() => $setup.effectiveSlots.figure({ figure: block.figure, index: bi })), { key: 0 })) : (_openBlock3(), _createElementBlock3("img", {
-                  key: 1,
+                $setup.effectiveSlots.figure ? (_openBlock5(), _createBlock2(_resolveDynamicComponent2(() => $setup.effectiveSlots.figure({ figure: block.figure, index: bi })), { key: 0 })) : $setup.failedImages.has(block.figure.filename) ? (_openBlock5(), _createElementBlock5("div", _hoisted_122)) : (_openBlock5(), _createElementBlock5("img", {
+                  key: 2,
                   src: `${$setup.ctx.assetBase}${block.figure.filename}`,
                   alt: block.figure.caption,
-                  loading: "lazy"
-                }, null, 8, _hoisted_53)),
-                block.figure.caption ? (_openBlock3(), _createElementBlock3("figcaption", {
-                  key: 2,
-                  innerHTML: $setup.renderParagraph(block.figure.caption)
-                }, null, 8, _hoisted_6)) : _createCommentVNode3("v-if", true)
-              ], 8, _hoisted_43)) : (_openBlock3(), _createBlock2($setup["MathBlock"], {
+                  loading: "lazy",
+                  onError: ($event) => $setup.onImageError(block.figure.filename)
+                }, null, 40, _hoisted_132)),
+                block.figure.caption || block.figure.number ? (_openBlock5(), _createElementBlock5("figcaption", _hoisted_142, [
+                  block.figure.number ? (_openBlock5(), _createElementBlock5(
+                    "strong",
+                    _hoisted_152,
+                    "Figure " + _toDisplayString4(block.figure.number) + ": ",
+                    1
+                    /* TEXT */
+                  )) : _createCommentVNode5("v-if", true),
+                  block.figure.caption ? (_openBlock5(), _createElementBlock5("span", {
+                    key: 1,
+                    innerHTML: $setup.renderParagraph(block.figure.caption)
+                  }, null, 8, _hoisted_16)) : _createCommentVNode5("v-if", true)
+                ])) : _createCommentVNode5("v-if", true)
+              ], 8, _hoisted_11)) : "code" in block ? (_openBlock5(), _createBlock2($setup["CodeBlock"], {
                 key: 3,
+                code: block.code.code,
+                caption: block.code.caption,
+                language: block.code.language
+              }, null, 8, ["code", "caption", "language"])) : "proof" in block ? (_openBlock5(), _createElementBlock5("div", _hoisted_17, [
+                _createElementVNode6("div", _hoisted_18, [
+                  _createElementVNode6("span", {
+                    class: "paper-proof-title",
+                    innerHTML: block.proof.name || "Proof"
+                  }, null, 8, _hoisted_19),
+                  _cache[0] || (_cache[0] = _createTextVNode2(
+                    " . ",
+                    -1
+                    /* CACHED */
+                  ))
+                ]),
+                _createElementVNode6("div", _hoisted_20, [
+                  (_openBlock5(true), _createElementBlock5(
+                    _Fragment2,
+                    null,
+                    _renderList(block.proof.content, (nested, ni) => {
+                      return _openBlock5(), _createElementBlock5(
+                        _Fragment2,
+                        {
+                          key: $setup.nestedBlockKey(`proof-${bi}`, ni, nested)
+                        },
+                        [
+                          typeof nested === "string" && $setup.isBlockHtml(nested) ? (_openBlock5(), _createElementBlock5("div", {
+                            key: 0,
+                            innerHTML: $setup.renderNestedText(nested)
+                          }, null, 8, _hoisted_21)) : typeof nested === "string" ? (_openBlock5(), _createElementBlock5("p", {
+                            key: 1,
+                            innerHTML: $setup.renderNestedText(nested)
+                          }, null, 8, _hoisted_222)) : "figure" in nested ? (_openBlock5(), _createElementBlock5("figure", {
+                            key: 2,
+                            id: $setup.figureId(nested.figure.label)
+                          }, [
+                            $setup.effectiveSlots.figure ? (_openBlock5(), _createBlock2(_resolveDynamicComponent2(() => $setup.effectiveSlots.figure({ figure: nested.figure, index: ni })), { key: 0 })) : (_openBlock5(), _createElementBlock5("img", {
+                              key: 1,
+                              src: `${$setup.ctx.assetBase}${nested.figure.filename}`,
+                              alt: nested.figure.caption,
+                              loading: "lazy"
+                            }, null, 8, _hoisted_242)),
+                            nested.figure.caption || nested.figure.number ? (_openBlock5(), _createElementBlock5("figcaption", _hoisted_252, [
+                              nested.figure.number ? (_openBlock5(), _createElementBlock5(
+                                "strong",
+                                _hoisted_26,
+                                "Figure " + _toDisplayString4(nested.figure.number) + ": ",
+                                1
+                                /* TEXT */
+                              )) : _createCommentVNode5("v-if", true),
+                              nested.figure.caption ? (_openBlock5(), _createElementBlock5("span", {
+                                key: 1,
+                                innerHTML: $setup.renderNestedText(nested.figure.caption)
+                              }, null, 8, _hoisted_27)) : _createCommentVNode5("v-if", true)
+                            ])) : _createCommentVNode5("v-if", true)
+                          ], 8, _hoisted_232)) : "code" in nested ? (_openBlock5(), _createBlock2($setup["CodeBlock"], {
+                            key: 3,
+                            code: nested.code.code,
+                            caption: nested.code.caption,
+                            language: nested.code.language
+                          }, null, 8, ["code", "caption", "language"])) : (_openBlock5(), _createBlock2($setup["MathBlock"], {
+                            key: 4,
+                            tex: nested.tex,
+                            id: nested.anchorId || nested.id,
+                            number: nested.number,
+                            numbered: nested.numbered
+                          }, null, 8, ["tex", "id", "number", "numbered"]))
+                        ],
+                        64
+                        /* STABLE_FRAGMENT */
+                      );
+                    }),
+                    128
+                    /* KEYED_FRAGMENT */
+                  ))
+                ])
+              ])) : (_openBlock5(), _createBlock2($setup["MathBlock"], {
+                key: 5,
                 tex: block.tex,
-                id: block.id
-              }, null, 8, ["tex", "id"]))
+                id: block.anchorId || block.id,
+                number: block.number,
+                numbered: block.numbered
+              }, null, 8, ["tex", "id", "number", "numbered"]))
             ],
             64
             /* STABLE_FRAGMENT */
@@ -1236,19 +1753,19 @@ function render5(_ctx, _cache, $props, $setup, $data, $options) {
         128
         /* KEYED_FRAGMENT */
       )),
-      $props.section.callout ? (_openBlock3(), _createElementBlock3(
+      $props.section.callout ? (_openBlock5(), _createElementBlock5(
         _Fragment2,
         { key: 0 },
         [
-          $setup.effectiveSlots.callout ? (_openBlock3(), _createBlock2(_resolveDynamicComponent2(() => $setup.effectiveSlots.callout({ callout: $props.section.callout, section: $props.section })), { key: 0 })) : (_openBlock3(), _createElementBlock3("div", _hoisted_7, [
-            _createElementVNode5("a", {
+          $setup.effectiveSlots.callout ? (_openBlock5(), _createBlock2(_resolveDynamicComponent2(() => $setup.effectiveSlots.callout({ callout: $props.section.callout, section: $props.section })), { key: 0 })) : (_openBlock5(), _createElementBlock5("div", _hoisted_28, [
+            _createElementVNode6("a", {
               href: $props.section.callout.link
-            }, _toDisplayString3($props.section.callout.text), 9, _hoisted_8)
+            }, _toDisplayString4($props.section.callout.text), 9, _hoisted_29)
           ]))
         ],
         64
         /* STABLE_FRAGMENT */
-      )) : _createCommentVNode3("v-if", true)
+      )) : _createCommentVNode5("v-if", true)
     ],
     64
     /* STABLE_FRAGMENT */
@@ -1256,14 +1773,14 @@ function render5(_ctx, _cache, $props, $setup, $data, $options) {
 }
 
 // src/vue/components/PaperSectionBlocks.vue
-PaperSectionBlocks_default.render = render5;
+PaperSectionBlocks_default.render = render6;
 PaperSectionBlocks_default.__file = "src/vue/components/PaperSectionBlocks.vue";
 var PaperSectionBlocks_default2 = PaperSectionBlocks_default;
 
 // sfc-script:/Users/mkbabb/Programming/latex-paper/src/vue/components/PaperSectionContent.vue?type=script
-import { defineComponent as _defineComponent6 } from "vue";
-import { inject as inject8, provide as provide2, useSlots as useSlots2 } from "vue";
-var PaperSectionContent_default = /* @__PURE__ */ _defineComponent6({
+import { defineComponent as _defineComponent7 } from "vue";
+import { inject as inject9, provide as provide2, useSlots as useSlots2 } from "vue";
+var PaperSectionContent_default = /* @__PURE__ */ _defineComponent7({
   __name: "PaperSectionContent",
   props: {
     section: { type: Object, required: true },
@@ -1274,7 +1791,7 @@ var PaperSectionContent_default = /* @__PURE__ */ _defineComponent6({
     __expose();
     const props = __props;
     const ownSlots = useSlots2();
-    const parentSlots = inject8(CONTENT_SLOTS, null);
+    const parentSlots = inject9(CONTENT_SLOTS, null);
     const effectiveSlots = parentSlots ?? ownSlots;
     provide2(CONTENT_SLOTS, effectiveSlots);
     const __returned__ = { props, ownSlots, parentSlots, effectiveSlots, PaperSectionBlocks: PaperSectionBlocks_default2, PaperSection: PaperSection_default2 };
@@ -1284,10 +1801,10 @@ var PaperSectionContent_default = /* @__PURE__ */ _defineComponent6({
 });
 
 // sfc-template:/Users/mkbabb/Programming/latex-paper/src/vue/components/PaperSectionContent.vue?type=template
-import { createVNode as _createVNode, createCommentVNode as _createCommentVNode4, renderList as _renderList2, Fragment as _Fragment3, openBlock as _openBlock4, createElementBlock as _createElementBlock4, resolveComponent as _resolveComponent, createBlock as _createBlock3, withCtx as _withCtx3 } from "vue";
-function render6(_ctx, _cache, $props, $setup, $data, $options) {
+import { createVNode as _createVNode, createCommentVNode as _createCommentVNode6, renderList as _renderList2, Fragment as _Fragment3, openBlock as _openBlock6, createElementBlock as _createElementBlock6, resolveComponent as _resolveComponent, createBlock as _createBlock3, withCtx as _withCtx3 } from "vue";
+function render7(_ctx, _cache, $props, $setup, $data, $options) {
   const _component_PaperSectionContent = _resolveComponent("PaperSectionContent", true);
-  return _openBlock4(), _createBlock3($setup["PaperSection"], {
+  return _openBlock6(), _createBlock3($setup["PaperSection"], {
     id: $props.section.id,
     number: $props.section.number,
     title: $props.section.title,
@@ -1296,12 +1813,12 @@ function render6(_ctx, _cache, $props, $setup, $data, $options) {
   }, {
     default: _withCtx3(() => [
       _createVNode($setup["PaperSectionBlocks"], { section: $props.section }, null, 8, ["section"]),
-      _createCommentVNode4(" Recursive subsections "),
-      $props.section.subsections ? (_openBlock4(true), _createElementBlock4(
+      _createCommentVNode6(" Recursive subsections "),
+      $props.section.subsections ? (_openBlock6(true), _createElementBlock6(
         _Fragment3,
         { key: 0 },
         _renderList2($props.section.subsections, (sub) => {
-          return _openBlock4(), _createBlock3(_component_PaperSectionContent, {
+          return _openBlock6(), _createBlock3(_component_PaperSectionContent, {
             key: sub.id,
             section: sub,
             depth: $props.depth + 1,
@@ -1310,7 +1827,7 @@ function render6(_ctx, _cache, $props, $setup, $data, $options) {
         }),
         128
         /* KEYED_FRAGMENT */
-      )) : _createCommentVNode4("v-if", true)
+      )) : _createCommentVNode6("v-if", true)
     ]),
     _: 1
     /* STABLE */
@@ -1318,10 +1835,11 @@ function render6(_ctx, _cache, $props, $setup, $data, $options) {
 }
 
 // src/vue/components/PaperSectionContent.vue
-PaperSectionContent_default.render = render6;
+PaperSectionContent_default.render = render7;
 PaperSectionContent_default.__file = "src/vue/components/PaperSectionContent.vue";
 var PaperSectionContent_default2 = PaperSectionContent_default;
 export {
+  CodeBlock_default2 as CodeBlock,
   MathBlock_default2 as MathBlock,
   MathInline_default2 as MathInline,
   PAPER_CONTEXT,
@@ -1337,6 +1855,7 @@ export {
   usePaperReader,
   useScrollTo,
   useScrollTracker,
+  useSidebarFollow,
   useTreeIndex,
   useVirtualSectionWindow
 };

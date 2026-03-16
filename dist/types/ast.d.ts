@@ -7,6 +7,8 @@ export interface MathNode {
     type: "math";
     value: string;
     display: boolean;
+    environment?: string;
+    numbered?: boolean;
     /** Original content before label stripping — used by label collection. */
     rawValue?: string;
 }
@@ -67,6 +69,7 @@ export interface FigureNode {
 }
 export interface ProofNode {
     type: "proof";
+    name?: string;
     body: LatexNode[];
 }
 export interface QuoteNode {
@@ -77,5 +80,11 @@ export interface LabelNode {
     type: "label";
     key: string;
 }
-export type LatexNode = TextNode | MathNode | CommandNode | EnvironmentNode | GroupNode | CommentNode | ParagraphBreakNode | SectionNode | TheoremNode | ListNode | DescriptionNode | FigureNode | ProofNode | QuoteNode | LabelNode;
+export interface CodeBlockNode {
+    type: "codeBlock";
+    code: string;
+    caption?: string;
+    language?: string;
+}
+export type LatexNode = TextNode | MathNode | CommandNode | EnvironmentNode | GroupNode | CommentNode | ParagraphBreakNode | SectionNode | TheoremNode | ListNode | DescriptionNode | FigureNode | ProofNode | QuoteNode | LabelNode | CodeBlockNode;
 //# sourceMappingURL=ast.d.ts.map

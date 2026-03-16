@@ -18,6 +18,8 @@ describe("math parsers", () => {
             type: "math",
             value: "x^2 + y^2",
             display: true,
+            environment: "$$",
+            numbered: false,
         });
     });
 
@@ -27,6 +29,8 @@ describe("math parsers", () => {
             type: "math",
             value: "x^2",
             display: true,
+            environment: "\\[\\]",
+            numbered: false,
         });
     });
 

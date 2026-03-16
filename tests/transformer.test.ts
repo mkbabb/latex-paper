@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Transformer, transformDocument } from "../src/transform/html";
 import { parseLatex } from "../src/grammar/document";
 import { parseBibToMap } from "../src/bibtex/parser";
+import { createCompiledPaperMetadata } from "../src/compiled/metadata";
 import type { LatexNode } from "../src/types/ast";
 
 describe("Transformer", () => {
@@ -119,6 +120,37 @@ describe("Transformer", () => {
         });
         expect(html).toContain("<strong>Title</strong>");
     });
+
+    it("renders bibliography from cited entries", () => {
+        const bibEntries = parseBibToMap(
+            `@article{key1,
+  author = {John Smith},
+  title = {A Paper},
+  year = {2020}
+}
+@book{key2,
+  author = {Jane Doe},
+  title = {Another Work},
+  year = {2021}
+}`,
+        );
+
+        const t = new Transformer({ bibEntries });
+        t.nodeToHtml({
+            type: "command",
+            name: "cite",
+            args: [[{ type: "text", value: "key1" }]],
+        });
+
+        const html = t.nodeToHtml({
+            type: "command",
+            name: "bibliography",
+            args: [[{ type: "text", value: "refs" }]],
+        });
+        expect(html).toContain("paper-bibliography");
+        expect(html).toContain("A Paper");
+        expect(html).not.toContain("Another Work");
+    });
 });
 
 describe("transformDocument", () => {
@@ -210,5 +242,153 @@ describe("transformDocument", () => {
             text: "Try it!",
             link: "/app",
         });
+    });
+
+    it("prefers compiled numbering, bibliography placement, and anchor metadata", () => {
+        const source = `
+\\begin{document}
+\\section{Introduction}
+\\label{sec:intro}
+\\begin{equation}
+x = 1
+\\end{equation}
+\\chapter{Linear Algebra}
+\\section{Alternative Orthogonal Bases}
+\\label{sec:orthogonal_polynomials}
+\\begin{definition}[Kronecker Delta]
+Body.
+\\end{definition}
+\\begin{equation}
+\\label{eq:test}
+E = mc^2
+\\end{equation}
+See Section~\\ref{sec:orthogonal_polynomials} and \\eqref{eq:test}.
+\\bibliography{paper}
+\\end{document}
+        `;
+        const compiledMetadata = createCompiledPaperMetadata({
+            texSource: `
+\\newtheorem{theorem}{Theorem}[section]
+\\newtheorem{definition}{Definition}[section]
+\\newtheorem{example}{Example}[section]
+${source}
+            `,
+            tocSource: `
+\\contentsline {section}{\\numberline {0.1}Introduction}{4}{section.0.1}%
+\\contentsline {chapter}{\\numberline {1}Linear Algebra}{5}{chapter.1}%
+\\contentsline {section}{\\numberline {1.1}Alternative Orthogonal Bases}{6}{section.1.1}%
+            `,
+            auxSource: `
+\\newlabel{sec:intro}{{0.1}{4}{Introduction}{section.0.1}{}}
+\\newlabel{sec:orthogonal_polynomials}{{1.1}{6}{Alternative Orthogonal Bases}{section.1.1}{}}
+\\newlabel{eq:test}{{1.1}{6}{Alternative Orthogonal Bases}{equation.1.1}{}}
+            `,
+            bblSource: `
+\\begin{thebibliography}{1}
+\\bibitem{heat_fourier}
+Jean-Baptiste~Joseph Fourier.
+\\newblock {\\em Th\'{e}orie analytique de la chaleur}.
+\\end{thebibliography}
+            `,
+            logSource: "Output written on paper.pdf (12 pages, 42 bytes).",
+        });
+
+        const { sections, labelMap } = transformDocument(parseLatex(source), {
+            compiledMetadata,
+        });
+
+        expect(sections[0].number).toBe("0.1");
+        expect(sections[1].number).toBe("1");
+        expect(sections[1].subsections?.[0]?.number).toBe("1.1");
+        expect(sections[2]).toMatchObject({
+            id: "bibliography",
+            title: "Bibliography",
+            number: "2",
+        });
+
+        const introEquation = sections[0].content.find(
+            (block) => typeof block === "object" && block !== null && "tex" in block,
+        );
+        const orthogonalSection = sections[1].subsections?.[0];
+        const definitionBlock = orthogonalSection?.content.find(
+            (block) => typeof block === "object" && block !== null && "theorem" in block,
+        );
+        const labeledEquation = orthogonalSection?.content.find(
+            (block) =>
+                typeof block === "object" &&
+                block !== null &&
+                "tex" in block &&
+                block.anchorId === "eq-test",
+        );
+        const refParagraph = orthogonalSection?.content.find(
+            (block) => typeof block === "string" && block.includes("paper-ref"),
+        );
+
+        expect(introEquation && typeof introEquation === "object" && "number" in introEquation && introEquation.number).toBe("0.1");
+        expect(
+            definitionBlock &&
+                typeof definitionBlock === "object" &&
+                "theorem" in definitionBlock &&
+                definitionBlock.theorem.number,
+        ).toBe("1.1.1");
+        expect(
+            labeledEquation &&
+                typeof labeledEquation === "object" &&
+                "number" in labeledEquation &&
+                labeledEquation.number,
+        ).toBe("1.1");
+        expect(refParagraph).toContain("1.1");
+        expect(refParagraph).toContain("(1.1)");
+        expect(labelMap["sec:orthogonal_polynomials"]?.anchorId).toBe(
+            "alternative-orthogonal-bases",
+        );
+        expect(labelMap["eq:test"]?.anchorId).toBe("eq-test");
+    });
+
+    it("preserves proof, code listings, and bibliography content blocks", () => {
+        const bibEntries = parseBibToMap(
+            `@article{sturm,
+  author = {Jacques Sturm},
+  title = {Memoire},
+  year = {1836}
+}`,
+        );
+        const ast = parseLatex(
+            "\\begin{document}\n\\chapter{Appendix}\n\\section{Sturm-Liouville Completeness}\n\\begin{proof}[Proof of Theorem]\\begin{equation}x^2\\end{equation}Thus done.\\end{proof}\n\\paragraph{Chebyshev fitting.} Sample text.\n\\begin{lstlisting}[caption={Chebyshev coefficient computation (\\texttt{bases\\_fitting.py})}]\ncoeffs = fit(values)\n\\end{lstlisting}\nSee \\cite{sturm}.\n\\bibliography{paper}\n\\end{document}",
+        );
+        const { sections } = transformDocument(ast, { bibEntries });
+        const appendix = sections[0].subsections?.[0];
+        expect(appendix).toBeDefined();
+        if (!appendix) return;
+
+        const proofBlock = appendix.content.find(
+            (block) => typeof block === "object" && block !== null && "proof" in block,
+        );
+        const codeBlock = appendix.content.find(
+            (block) => typeof block === "object" && block !== null && "code" in block,
+        );
+        const bibliography = appendix.content.find(
+            (block) => typeof block === "string" && block.includes("paper-bibliography"),
+        );
+
+        expect(proofBlock).toBeDefined();
+        expect(codeBlock).toBeDefined();
+        expect(bibliography).toBeDefined();
+        if (typeof proofBlock === "object" && proofBlock && "proof" in proofBlock) {
+            const proofText = proofBlock.proof.content.find(
+                (block) => typeof block === "string",
+            );
+            const proofMath = proofBlock.proof.content.find(
+                (block) => typeof block === "object" && "tex" in block,
+            );
+            expect(proofText).toContain("Thus done");
+            expect(proofMath && "tex" in proofMath ? proofMath.tex : "").toContain("x^2");
+            expect(proofMath && "number" in proofMath ? proofMath.number : undefined).toBe("1.1");
+            expect(proofMath && "numbered" in proofMath ? proofMath.numbered : undefined).toBe(true);
+        }
+        if (typeof codeBlock === "object" && codeBlock && "code" in codeBlock) {
+            expect(codeBlock.code.caption).toContain("bases_fitting.py");
+            expect(codeBlock.code.code).toContain("coeffs = fit(values)");
+        }
     });
 });

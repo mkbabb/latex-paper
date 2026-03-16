@@ -106,4 +106,30 @@ describe("integration: fixtures → PaperSectionData", () => {
         expect(allText).toContain("Fourier");
         expect(allText).toContain("1822");
     });
+
+    it("preserves lstlisting blocks and bibliography output", () => {
+        const bibEntries = parseBibToMap(loadFixture("sample.bib"));
+        const ast = parseLatex(
+            "\\begin{document}\n\\chapter{Appendix}\n\\section{Code}\nBefore.\n\\begin{lstlisting}[caption={Example (\\texttt{demo.py})}]\nprint('demo')\n\\end{lstlisting}\nAs shown by \\cite{fourier1822}.\n\\bibliography{sample}\n\\end{document}",
+        );
+        const { sections } = transformDocument(ast, { bibEntries });
+        const content = sections[0].subsections?.[0]?.content ?? [];
+        expect(
+            content.some(
+                (block) =>
+                    typeof block === "object" &&
+                    block !== null &&
+                    "code" in block &&
+                    block.code.code.includes("print('demo')"),
+            ),
+        ).toBe(true);
+        expect(
+            content.some(
+                (block) =>
+                    typeof block === "string" &&
+                    block.includes("paper-bibliography") &&
+                    block.includes("Fourier"),
+            ),
+        ).toBe(true);
+    });
 });

@@ -94,7 +94,7 @@ Body text.
         expect(pageMap[l2Section!.id]).toBe(38);
     });
 
-    it("warns on mismatched TOC counts and carries forward the last known page", () => {
+    it("carries forward the last known page for sections absent from the compiled TOC", () => {
         const source = makeDoc(`
 \\section{Introduction}
 \\chapter{Chapter}
@@ -118,7 +118,7 @@ Body text.
             section.section.title === "Missing TOC Entry",
         );
 
-        expect(warnings).toHaveLength(1);
+        expect(warnings).toHaveLength(0);
         expect(trackedTrailing).toBeDefined();
         expect(pageMap[trackedTrailing!.id]).toBe(6);
     });

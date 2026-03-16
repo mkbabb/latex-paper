@@ -90,6 +90,19 @@ describe("environment parsers", () => {
         expect(result!.type).toBe("quote");
     });
 
+    it("parses lstlisting with caption metadata", () => {
+        const result = environment.parse(
+            "\\begin{lstlisting}[caption={Example listing (\\texttt{foo.py})}, language=Python]\nprint('ok')\n\\end{lstlisting}",
+        );
+        expect(result).not.toBeNull();
+        expect(result!.type).toBe("codeBlock");
+        if (result!.type === "codeBlock") {
+            expect(result.caption).toContain("foo.py");
+            expect(result.language).toBe("Python");
+            expect(result.code).toContain("print('ok')");
+        }
+    });
+
     it("parses center environment as passthrough", () => {
         const result = environment.parse(
             "\\begin{center}\nsome content\n\\end{center}",

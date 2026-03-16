@@ -8,6 +8,7 @@ import {
     citeCommand,
     hrefCommand,
     paragraphCommand,
+    bibliographyCommand,
     skipCommand,
     footnoteCommand,
 } from "../../src/grammar/commands";
@@ -62,6 +63,15 @@ describe("command parsers", () => {
             expect(result.args[0][0]).toEqual({
                 type: "text",
                 value: "fourier1822",
+            });
+        });
+
+        it("parses \\bibliography{file}", () => {
+            const result = bibliographyCommand.parse("\\bibliography{fourier_paper}");
+            expect(result.name).toBe("bibliography");
+            expect(result.args[0][0]).toEqual({
+                type: "text",
+                value: "fourier_paper",
             });
         });
     });

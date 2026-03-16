@@ -142,14 +142,30 @@ describe("flattenPaperSections", () => {
                 {
                     theorem: {
                         type: "theorem",
-                        body: "Every compact operator has a spectral decomposition.",
-                        math: ["Tf = \\lambda f"],
+                        content: [
+                            "Every compact operator has a spectral decomposition.",
+                            { tex: "Tf = \\lambda f" },
+                        ],
                     },
                 },
                 {
                     figure: {
                         filename: "spectrum.png",
                         caption: "A rendered spectral plot.",
+                    },
+                },
+                {
+                    proof: {
+                        content: [
+                            "A proof body with enough prose to matter.",
+                            { tex: "A_n \\to A" },
+                        ],
+                    },
+                },
+                {
+                    code: {
+                        code: "def fit(signal):\n    return signal",
+                        caption: "A compact fitting helper.",
                     },
                 },
             ],
@@ -161,6 +177,6 @@ describe("flattenPaperSections", () => {
 
         const estimate = estimatePaperSectionHeight(section, 1);
         expect(estimate).toBeGreaterThan(300);
-        expect(estimate).toBeLessThan(1400);
+        expect(estimate).toBeLessThan(1800);
     });
 });

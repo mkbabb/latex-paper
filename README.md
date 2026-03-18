@@ -1,8 +1,8 @@
 # latex-paper
 
-LaTeX in, navigable paper data out.
+Input LaTeX and beget navigable paper data.
 
-`latex-paper` parses `.tex` and `.bib`, resolves labels and citations, builds a typed section tree, and can expose the result as a Vite virtual module. The Vue entry point adds the rendering and windowing primitives used by the paper view in `fourier-analysis`.
+`latex-paper` parses `.tex` and `.bib`, resolves labels and citations, builds a typed section tree, and can expose the result as a Vite virtual module. The Vue entry point adds the rendering and windowing primitives used by the paper view in [`fourier-analysis`](https://github.com/mkbabb/fourier-analysis).
 
 See [docs/virtual-paper.md](docs/virtual-paper.md) for the end-to-end path.
 
@@ -89,14 +89,6 @@ interface PaperSectionData {
 - `FigureBlock`—figure with caption
 - `CodeBlock`—code listing
 - `ProofBlock`—proof body
-
-## Development
-
-```bash
-npm test
-npm run build
-npm pack
-```
 
 ## Notes
 

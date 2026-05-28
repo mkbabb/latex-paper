@@ -93,3 +93,12 @@ interface PaperSectionData {
 ## Notes
 
 - KaTeX is optional at the package level and used by the Vue entry point.
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md). The README shape follows the perimeter-level
+[canonical README shape](https://github.com/mkbabb/glass-ui/blob/master/docs/precepts/canonical-readme-shape.md).
+
+## License
+
+[MIT](./LICENSE) © 2026 Mike Babb.

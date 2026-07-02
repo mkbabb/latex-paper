@@ -7,8 +7,8 @@ import type { PaperNestedBlock, PaperSectionData } from "../types/output";
 
 /** Patterns that indicate unprocessed LaTeX in output. */
 const SUSPICIOUS_PATTERNS: Array<{ pattern: RegExp; description: string }> = [
-    { pattern: /\\['"` ^~]\{[a-zA-Z]\}/, description: "Unprocessed braced accent" },
-    { pattern: /\\['"` ^~][a-zA-Z]/, description: "Unprocessed unbraced accent" },
+    { pattern: /\\['"`^~]\{[a-zA-Z]\}/, description: "Unprocessed braced accent" },
+    { pattern: /\\['"`^~][a-zA-Z]/, description: "Unprocessed unbraced accent" },
     { pattern: /\\c\{[a-zA-Z]\}/, description: "Unprocessed cedilla" },
     { pattern: /\\text(?:it|bf|tt)\{/, description: "Unprocessed formatting command" },
     { pattern: /\\emph\{/, description: "Unprocessed \\emph" },

@@ -6,6 +6,8 @@
  * `H S% L%` triples; 0.3.0, X-DS DS-F7-C1):
  *   --primary, --foreground, --border, --muted, --muted-foreground,
  *   --accent-pink, --section-heading, --card, --radius, --_section-color
+ * Optional: --theorem-accent, the theorem/proposition/corollary hue (it
+ *   defaults to --primary; set it when --primary is an ink in one theme).
  *
  * Scoped under `.paper-article` for specificity.
  */
@@ -48,6 +50,20 @@
     font-size: 0.8rem;
     color: var(--muted-foreground);
     white-space: nowrap;
+    /* Upright inside a theorem's italic too (X-DS DS-F8-C3). */
+    font-style: normal;
+}
+
+/* Below a narrow measure the number drops under its display, so the
+   equation takes the full width (X-DS DS-F8-C5). */
+@media (max-width: 40rem) {
+    .paper-article .math-block {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .paper-article .math-block__number {
+        justify-self: end;
+    }
 }
 
 /* No hover ornament on a display equation (X-DS DS-F7-C1). */
@@ -80,7 +96,7 @@
 .paper-article .theorem-block--theorem,
 .paper-article .theorem-block--proposition,
 .paper-article .theorem-block--corollary {
-    border-left-color: var(--primary);
+    border-left-color: var(--theorem-accent, var(--primary));
 }
 
 .paper-article .theorem-block--definition,
@@ -100,7 +116,7 @@
 .paper-article .theorem-block--theorem .theorem-label,
 .paper-article .theorem-block--proposition .theorem-label,
 .paper-article .theorem-block--corollary .theorem-label {
-    color: var(--primary);
+    color: var(--theorem-accent, var(--primary));
 }
 
 .paper-article .theorem-block--definition .theorem-label,

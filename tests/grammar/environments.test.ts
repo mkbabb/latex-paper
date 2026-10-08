@@ -51,6 +51,24 @@ describe("environment parsers", () => {
         }
     });
 
+    it("parses description terms from \\item[term]", () => {
+        const result = environment.parse(
+            "\\begin{description}\n\\item[Fourier Series] Represent a function.\n\\item[Fourier Transform] Extract the frequencies.\n\\end{description}",
+        );
+        expect(result).not.toBeNull();
+        expect(result!.type).toBe("description");
+        if (result!.type === "description") {
+            expect(result.items.length).toBe(2);
+            expect(result.items.map((i) => i.term)).toEqual([
+                [{ type: "text", value: "Fourier Series" }],
+                [{ type: "text", value: "Fourier Transform" }],
+            ]);
+            expect(JSON.stringify(result.items[1].body)).toContain(
+                "Extract the frequencies.",
+            );
+        }
+    });
+
     it("parses figure environment", () => {
         const result = environment.parse(
             "\\begin{figure}\n\\includegraphics{test.png}\n\\caption{A figure.}\n\\label{fig:test}\n\\end{figure}",

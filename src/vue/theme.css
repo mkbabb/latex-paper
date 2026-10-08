@@ -64,6 +64,12 @@
     .paper-article .math-block__number {
         justify-self: end;
     }
+
+    /* The number hugs the display's last line (X-DS DS-F9-C6). */
+    .paper-article .math-block .katex-display {
+        margin-block-end: 0;
+        padding-block-end: 0;
+    }
 }
 
 /* No hover ornament on a display equation (X-DS DS-F7-C1). */
@@ -569,8 +575,22 @@
     padding-left: 1.5rem;
 }
 
+/* The marker is restated: a host's CSS reset (Tailwind preflight) sets
+   list-style none, and the 1.5rem indent exists for it (X-DS DS-F9-C2). */
+.paper-article .section-body ol.paper-list {
+    list-style: decimal;
+}
+
+.paper-article .section-body ul.paper-list {
+    list-style: disc;
+}
+
 .paper-article .section-body .paper-list li {
     margin: 0.25rem 0;
+}
+
+.paper-article .section-body .paper-list li::marker {
+    color: var(--muted-foreground);
 }
 
 .paper-article .section-body .paper-description {

@@ -3,7 +3,7 @@
  */
 
 import { Parser, ParserState, regex, string } from "@mkbabb/parse-that";
-import type { LatexNode } from "../types/ast";
+import type { CommandNode, LatexNode } from "../types/ast";
 
 // ── Lazy reference cell for inlineNode ──────────────────────────────
 // Allows environments.ts and commands.ts to reference the top-level
@@ -197,36 +197,36 @@ export function nodesUntilEnd(envName: string): Parser<LatexNode[]> {
 }
 
 /**
- * Split list content on \item commands, returning arrays of nodes for each item.
- * Handles nesting depth tracking for nested lists.
+ * Split list content on \item commands. Each item keeps its \item command
+ * (whose optional `[label]` is a description term) beside its body nodes.
  */
-export function splitOnItem(body: LatexNode[]): LatexNode[][] {
-    const items: LatexNode[][] = [];
-    let current: LatexNode[] = [];
+export function splitItems(
+    body: LatexNode[],
+): { item: CommandNode; nodes: LatexNode[] }[] {
+    const items: { item: CommandNode; nodes: LatexNode[] }[] = [];
+    let current: { item: CommandNode; nodes: LatexNode[] } | undefined;
 
     for (const node of body) {
-        if (
-            node.type === "command" &&
-            node.name === "item"
-        ) {
-            if (current.length > 0) {
-                items.push(current);
-            }
-            current = [];
-        } else {
-            current.push(node);
+        if (node.type === "command" && node.name === "item") {
+            current = { item: node, nodes: [] };
+            items.push(current);
+        } else if (current) {
+            current.nodes.push(node);
         }
     }
-    if (current.length > 0) {
-        items.push(current);
-    }
 
-    // Filter out items with only whitespace/empty text nodes
-    return items.filter((item) =>
-        item.some(
-            (node) =>
-                node.type !== "text" ||
-                node.value.trim().length > 0,
-        ),
+    // Filter out items with no label and only whitespace/empty text nodes
+    return items.filter(
+        ({ item, nodes }) =>
+            item.optArgs?.length ||
+            nodes.some(
+                (node) =>
+                    node.type !== "text" || node.value.trim().length > 0,
+            ),
     );
+}
+
+/** Split list content on \item commands, returning each item's body nodes. */
+export function splitOnItem(body: LatexNode[]): LatexNode[][] {
+    return splitItems(body).map(({ nodes }) => nodes);
 }

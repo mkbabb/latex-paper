@@ -22,6 +22,7 @@ import {
     rawUntilEnd,
     nodesUntilEnd,
     splitOnItem,
+    splitItems,
 } from "./primitives";
 import { isMathEnv, mathEnvBody } from "./math";
 
@@ -67,39 +68,14 @@ function parseListEnv(envName: string, ordered: boolean): Parser<ListNode> {
 // ── Description environment ─────────────────────────────────────────
 
 function parseDescriptionEnv(): Parser<DescriptionNode> {
-    return nodesUntilEnd("description").map((body) => {
-        const rawItems = splitOnItem(body);
-        const items: DescriptionNode["items"] = [];
-
-        for (const itemNodes of rawItems) {
-            // The first node might contain the [term] from \item[term]
-            // which was parsed as an optArg on the item command
-            const term: LatexNode[] = [];
-            const bodyNodes: LatexNode[] = [];
-            let foundTerm = false;
-
-            for (const node of itemNodes) {
-                if (
-                    !foundTerm &&
-                    node.type === "command" &&
-                    node.name === "item" &&
-                    node.optArgs?.length
-                ) {
-                    term.push(...node.optArgs[0]);
-                    foundTerm = true;
-                } else {
-                    bodyNodes.push(node);
-                }
-            }
-
-            items.push({ term, body: bodyNodes });
-        }
-
-        return {
-            type: "description" as const,
-            items,
-        };
-    });
+    return nodesUntilEnd("description").map((body) => ({
+        type: "description" as const,
+        // \item[term] carries the term as the item command's optArg.
+        items: splitItems(body).map(({ item, nodes }) => ({
+            term: item.optArgs?.[0] ?? [],
+            body: nodes,
+        })),
+    }));
 }
 
 // ── Figure environment ──────────────────────────────────────────────

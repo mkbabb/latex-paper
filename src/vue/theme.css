@@ -420,12 +420,22 @@
     background: hsl(var(--card));
     box-shadow: none;
     padding: 0.75rem 1rem 0.25rem;
+    margin-top: 2rem;
     margin-left: -1rem;
     margin-right: -1rem;
     border-radius: var(--radius);
 }
 
+/* X-DS DS-F5-C6 (folds DS-F4-C5): a heading's space before is larger than
+   its space after, so it binds to the text it introduces, not to the
+   paragraph above it. The margin sits on the header itself, because a
+   consumer's windowed render (fourier's PaperArticleWindow) wraps every
+   section in its own `.paper-window-section`, so a sibling rule between a
+   section and the prose before it never matches. Measured on fourier's /paper: "1.2.1" sat ~8 px
+   under the block above and ~22 px over its own text; with 1.5rem it is
+   ~32 over ~22 (1440) and ~48 over ~22 (390). The bottom stays tight. */
 .paper-article .section-header--sub {
+    margin-top: 1.5rem;
     position: sticky;
     top: 3.5rem;
     z-index: 9;

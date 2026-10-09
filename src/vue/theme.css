@@ -597,8 +597,10 @@
     margin: 0.75rem 0;
 }
 
+/* X-DS DS-F4-C1: the term on the text face's semibold rung, flush, with its
+   definition hanging under it; no fill, no rule, no shadow. */
 .paper-article .section-body .paper-description dt {
-    font-weight: 700;
+    font-weight: 600;
     margin-top: 0.5rem;
 }
 

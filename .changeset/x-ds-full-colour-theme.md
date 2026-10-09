@@ -7,3 +7,5 @@ theme: read colour tokens as full colours (`var(--primary)`, `color-mix(in srgb,
 Also (X-DS DS-F8-C1, C3, C5): the theorem, proposition and corollary rule and label read an optional `--theorem-accent` (defaulting to `--primary`), for consumers whose `--primary` is an ink in one theme; an equation number is upright inside a theorem's italic; and below a 40rem viewport the equation number drops under its display so the equation takes the full width.
 
 Also (X-DS DS-F9-C2, C3, C6): `\item[term]` in a `description` environment is parsed into `DescriptionNode.term` (the item command's optional argument was dropped by the item split, so every `<dt>` rendered empty); `ol.paper-list` and `ul.paper-list` restate their `decimal` and `disc` markers (muted `::marker`) against a host's CSS reset; and in the below-40rem arm a display's block-end margin and padding are zeroed so the stacked number hugs its last line.
+
+Also (X-DS DS-F4-C1): a description term (`<dt>`) sits on the semibold rung (600, was 700), flush, its definition hanging under it.

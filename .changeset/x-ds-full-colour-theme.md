@@ -9,3 +9,5 @@ Also (X-DS DS-F8-C1, C3, C5): the theorem, proposition and corollary rule and la
 Also (X-DS DS-F9-C2, C3, C6): `\item[term]` in a `description` environment is parsed into `DescriptionNode.term` (the item command's optional argument was dropped by the item split, so every `<dt>` rendered empty); `ol.paper-list` and `ul.paper-list` restate their `decimal` and `disc` markers (muted `::marker`) against a host's CSS reset; and in the below-40rem arm a display's block-end margin and padding are zeroed so the stacked number hugs its last line.
 
 Also (X-DS DS-F4-C1): a description term (`<dt>`) sits on the semibold rung (600, was 700), flush, its definition hanging under it.
+
+Also (X-DS DS-F7C-C2): a proof's label sets its period against its word ("Proof."); the Vue template's line breaks rendered it as "Proof . ".

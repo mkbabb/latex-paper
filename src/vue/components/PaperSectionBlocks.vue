@@ -155,13 +155,13 @@ function figureId(label?: string): string | undefined {
         />
 
         <div v-else-if="'proof' in block" class="paper-proof-block">
-            <div class="paper-proof-label">
-                <span
+            <!-- X-DS DS-F7C-C2: the period is set against its word ("Proof."),
+                 with no text node of whitespace between them (the template's
+                 line breaks condensed to " . "). -->
+            <div class="paper-proof-label"><span
                     class="paper-proof-title"
                     v-html="block.proof.name || 'Proof'"
-                />
-                .
-            </div>
+                />.</div>
             <div class="paper-proof-body">
                 <template
                     v-for="(nested, ni) in block.proof.content"

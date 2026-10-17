@@ -74,12 +74,6 @@
 
 /* No hover ornament on a display equation (X-DS DS-F7-C1). */
 
-/* ── Math inline ───────────────────────────────────────────── */
-
-.paper-article .math-inline {
-    white-space: nowrap;
-}
-
 /* ── Theorem blocks ────────────────────────────────────────── */
 
 .paper-article .theorem-block {
@@ -550,14 +544,12 @@
     color: var(--foreground);
 }
 
+/* An author-year reference is prose: the text face, on the line. */
 .paper-article .section-body .paper-cite {
+    font: inherit;
     font-style: normal;
-    font-size: 0.8em;
     color: var(--primary);
     cursor: default;
-    font-family: "Fira Code", monospace;
-    vertical-align: super;
-    line-height: 0;
 }
 
 .paper-article .section-body .paper-quote {

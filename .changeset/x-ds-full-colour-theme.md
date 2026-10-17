@@ -11,3 +11,5 @@ Also (X-DS DS-F9-C2, C3, C6): `\item[term]` in a `description` environment is pa
 Also (X-DS DS-F4-C1): a description term (`<dt>`) sits on the semibold rung (600, was 700), flush, its definition hanging under it.
 
 Also (X-DS DS-F7C-C2): a proof's label sets its period against its word ("Proof."); the Vue template's line breaks rendered it as "Proof . ".
+
+Also (X-DS DS-F8C-C1, C2, T1): a theorem-like environment's optional title (`\begin{theorem}[Name \cite{key}]`) is parsed through the inline parser, as prose is, so `\cite` renders as `.paper-cite` (with accents, math and nested commands) instead of a raw text node whose `\c` was read as the cedilla accent ("Name itekey"); `.paper-cite` is set in the text face on the line (`font: inherit`, no `vertical-align: super`, no mono), since every citation is author-year; and the theme's `white-space: nowrap` on `.math-inline` is removed, so a long inline formula breaks at KaTeX's own relation and operator points instead of running past the measure.

@@ -18,6 +18,7 @@ import type {
 import {
     braceBalanced,
     bracketBalanced,
+    bracketContent,
     ws,
     rawUntilEnd,
     nodesUntilEnd,
@@ -42,15 +43,13 @@ const THEOREM_TYPES = new Set([
 
 function parseTheoremEnv(envName: string): Parser<TheoremNode> {
     return ws
-        .next(bracketBalanced().opt())
+        .next(bracketContent().opt())
         .skip(ws)
         .then(nodesUntilEnd(envName))
         .map(([name, body]) => ({
             type: "theorem" as const,
             envType: envName,
-            ...(name != null && {
-                name: [{ type: "text" as const, value: name }],
-            }),
+            ...(name != null && { name }),
             body,
         }));
 }

@@ -139,6 +139,32 @@ export function bracketBalanced(): Parser<string> {
     });
 }
 
+/**
+ * Match a bracket-balanced group [content] and parse its inner content
+ * through the inline parser, the same path as prose: a theorem's optional
+ * title keeps its \cite, accents, math and nested commands as nodes rather
+ * than as raw text.
+ */
+export function bracketContent(): Parser<LatexNode[]> {
+    return bracketBalanced().map((inner) => {
+        const nodes: LatexNode[] = [];
+        const state = new ParserState<LatexNode | null>(inner);
+        const nodeParser = getInlineNode();
+        while (state.offset < inner.length) {
+            const saved = state.offset;
+            state.isError = false;
+            nodeParser.parser(state);
+            if (state.isError || state.offset === saved) {
+                state.offset = saved + 1;
+                state.isError = false;
+            } else if (state.value != null) {
+                nodes.push(state.value);
+            }
+        }
+        return nodes;
+    });
+}
+
 /** Scan forward until \end{envName} is found, returning raw content. */
 export function rawUntilEnd(envName: string): Parser<string> {
     return new Parser((state) => {

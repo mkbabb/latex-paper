@@ -182,6 +182,26 @@ describe("transformDocument", () => {
         expect(sections[0].theorems!.length).toBe(1);
     });
 
+    it("renders a theorem's optional title through the inline renderer (\\cite)", () => {
+        const bibEntries = parseBibToMap(
+            `@article{davis,
+  author = {Philip Davis},
+  title = {Circulant Matrices},
+  year = {1979}
+}`,
+        );
+        const ast = parseLatex(
+            "\\begin{document}\n\\chapter{Ch}\n\\begin{theorem}[Circulant Diagonalization \\cite{davis}]\nA theorem statement here.\n\\end{theorem}\n\\begin{definition}[Fran\\c{c}ois's \\emph{form}]\nA definition here.\n\\end{definition}\n\\end{document}",
+        );
+        const { sections } = transformDocument(ast, { bibEntries });
+        const [thm, def] = sections[0].theorems!;
+        expect(thm.name).toContain('class="paper-cite"');
+        expect(thm.name).not.toMatch(/ite\s*davis/);
+        expect(thm.name).toMatch(/^Circulant Diagonalization /);
+        expect(def.name).toContain("François");
+        expect(def.name).toContain("<em>form</em>");
+    });
+
     it("interleaves display math as MathBlockData in content", () => {
         const ast = parseLatex(
             "\\begin{document}\n\\chapter{Ch}\nBefore the equation paragraph text.\n\\[\nx^2 + y^2 = z^2\n\\]\nAfter the equation paragraph text.\n\\end{document}",

@@ -192,8 +192,10 @@
     margin: 1rem 0 1.25rem;
     padding: 0.875rem 1rem;
     border-left: 3px solid var(--border);
-    background: color-mix(in srgb, var(--card) 60%, transparent);
-    border-radius: 0.5rem;
+    /* Square on the rule's side, flat like the theorem block (X-DS
+       DS-F11C-L1): the 3px rule runs straight, and the 60% card tint was a
+       tone step too faint to read, so the rule alone marks the environment. */
+    border-radius: 0 0.5rem 0.5rem 0;
 }
 
 .paper-article .paper-proof-label {

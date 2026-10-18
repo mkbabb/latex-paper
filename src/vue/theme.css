@@ -61,15 +61,19 @@
         grid-template-columns: minmax(0, 1fr);
     }
 
+    /* The stacked number is the row's last ink: it carries the display's
+       headroom step below it, so the row reads one step above and below at
+       every width (X-DS DS-F13C-T1; was DS-F9-C6's zeroed display foot). */
     .paper-article .math-block__number {
         justify-self: end;
+        margin-block-end: 0.75rem;
     }
+}
 
-    /* The number hugs the display's last line (X-DS DS-F9-C6). */
-    .paper-article .math-block .katex-display {
-        margin-block-end: 0;
-        padding-block-end: 0;
-    }
+/* A display's spacing is its row's (X-DS DS-F13C-T1): inside a math-block the
+   KaTeX display carries no margin of its own. */
+.paper-article .math-block .katex-display {
+    margin-block: 0;
 }
 
 /* No hover ornament on a display equation (X-DS DS-F7-C1). */
@@ -79,9 +83,9 @@
 .paper-article .theorem-block {
     position: relative;
     margin: 1rem 0;
-    /* Square on the rule's side (X-DS DS-F3-C10): the 3px left rule runs
-       straight instead of curling into hooks at the corners. */
-    border-radius: 0 0.5rem 0.5rem 0;
+    /* No radius (X-DS DS-F3-C10, DS-F13C-N1): the 3px left rule runs
+       straight, and with no fill and no right or bottom border the block has
+       no corner to round. */
     border-left-width: 3px;
     border-left-style: solid;
     scroll-margin-top: 6rem;
@@ -170,12 +174,16 @@
     font-style: italic;
 }
 
+/* A display row in a theorem body is set off by 0.75rem and carries no
+   padding; the last row ends on the block's own 0.75rem inset, so the
+   label-to-ink and ink-to-foot gaps are one step (X-DS DS-F13C-T1). */
 .paper-article .theorem-body .math-block {
-    margin-left: 0.5rem;
-    margin-top: 0.25rem;
-    margin-bottom: 0.25rem;
-    padding-top: 0.25rem;
-    padding-bottom: 0.25rem;
+    margin: 0.75rem 0 0.75rem 0.5rem;
+    padding-block: 0;
+}
+
+.paper-article .theorem-body > .math-block:last-child {
+    margin-bottom: 0;
 }
 
 .paper-article .theorem-body .math-block + .math-block {

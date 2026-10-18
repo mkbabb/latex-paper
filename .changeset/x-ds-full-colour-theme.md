@@ -17,3 +17,5 @@ Also (X-DS DS-F8C-C1, C2, T1): a theorem-like environment's optional title (`\be
 Also (X-DS DS-F11C-L1): a proof block's 3px rule runs straight (`border-radius: 0 0.5rem 0.5rem 0`, as the theorem block's), and its 60% card tint is removed, so the rule alone marks the environment.
 
 Also (X-DS DS-F12C-T1): a theorem block and a proof block read one environment inset (`padding: 0.75rem 1.25rem`), so a proof's content keeps the theorem's inner edge and vertical padding (the proof was `0.875rem 1rem`, stepping 4px left); the proof block's border-radius is removed, since it has no fill and no right or bottom border.
+
+Also (X-DS DS-F13C-T1, N1): a display's spacing is its row's. Inside a `.math-block` the KaTeX display carries no margin; a display row in a theorem body is set off by 0.75rem with no padding, and the last row ends on the block's 0.75rem inset, so a theorem's label-to-formula and formula-to-foot gaps are one step; below 40rem the stacked equation number carries a 0.75rem step below it (replacing DS-F9-C6's zeroed display foot). The theorem block's trailing-corner radius is removed, as the proof block's was (no fill, no right or bottom border).

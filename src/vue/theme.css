@@ -84,8 +84,14 @@
     border-radius: 0 0.5rem 0.5rem 0;
     border-left-width: 3px;
     border-left-style: solid;
-    padding: 0.75rem 1.25rem;
     scroll-margin-top: 6rem;
+}
+
+/* One environment inset (X-DS DS-F12C-T1): a theorem and the proof that
+   follows it are each marked by a 3px left rule, so their content shares one
+   inner edge and one vertical rhythm. */
+.paper-article :is(.theorem-block, .paper-proof-block) {
+    padding: 0.75rem 1.25rem;
 }
 
 /* Flat (X-DS DS-F-C3): a theorem block is its type-coloured left rule and its
@@ -190,12 +196,10 @@
 
 .paper-article .paper-proof-block {
     margin: 1rem 0 1.25rem;
-    padding: 0.875rem 1rem;
     border-left: 3px solid var(--border);
-    /* Square on the rule's side, flat like the theorem block (X-DS
-       DS-F11C-L1): the 3px rule runs straight, and the 60% card tint was a
-       tone step too faint to read, so the rule alone marks the environment. */
-    border-radius: 0 0.5rem 0.5rem 0;
+    /* Flat (X-DS DS-F11C-L1, DS-F12C-T1): the rule alone marks the
+       environment. No tint, and so no radius: a block with no fill and no
+       right or bottom border has no corner to round. */
 }
 
 .paper-article .paper-proof-label {

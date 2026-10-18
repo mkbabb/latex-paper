@@ -39,7 +39,9 @@
     padding: 0.5rem 0;
     margin: 0.75rem 0;
     text-align: center;
-    padding-left: 1rem;
+    /* No inline inset (X-DS DS-F14C-T2): the 1rem padding-left set the ink off
+       a 2px hover rule that DS-F7-C1 deleted, so a display starts on its
+       column's text edge and a centred one centres on the true measure. */
 }
 
 .paper-article .math-block__equation {
@@ -93,9 +95,13 @@
 
 /* One environment inset (X-DS DS-F12C-T1): a theorem and the proof that
    follows it are each marked by a 3px left rule, so their content shares one
-   inner edge and one vertical rhythm. */
+   inner edge and one vertical rhythm. No inline-end inset (X-DS
+   DS-F14C-T1): with no fill and no right border it drew nothing and only
+   narrowed the measure, so an equation number in a block stopped 20px short
+   of a prose number's; the block's prose and numbers end on the measure. */
 .paper-article :is(.theorem-block, .paper-proof-block) {
-    padding: 0.75rem 1.25rem;
+    padding-block: 0.75rem;
+    padding-inline: 1.25rem 0;
 }
 
 /* Flat (X-DS DS-F-C3): a theorem block is its type-coloured left rule and its
@@ -176,9 +182,11 @@
 
 /* A display row in a theorem body is set off by 0.75rem and carries no
    padding; the last row ends on the block's own 0.75rem inset, so the
-   label-to-ink and ink-to-foot gaps are one step (X-DS DS-F13C-T1). */
+   label-to-ink and ink-to-foot gaps are one step (X-DS DS-F13C-T1). No
+   inline-start margin (X-DS DS-F14C-T2): a theorem's display starts on the
+   body's text edge, as a proof's and a prose display do. */
 .paper-article .theorem-body .math-block {
-    margin: 0.75rem 0 0.75rem 0.5rem;
+    margin: 0.75rem 0;
     padding-block: 0;
 }
 
